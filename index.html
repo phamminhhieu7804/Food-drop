@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="FOOD DROP" />
+  <meta name="theme-color" content="#f97316" />
+  <meta name="description" content="Bản đồ đánh giá & săn quán ăn dành cho hội bạn thân. Cùng nhau chốt quán, không còn câu hỏi 'ăn gì hôm nay?'" />
+
+  <!-- SEO -->
+  <title>FOOD DROP 🍜 - Bản đồ Quán Ăn Hội Bạn Thân</title>
+  <meta property="og:title" content="FOOD DROP - Bản đồ đánh giá quán ăn" />
+  <meta property="og:description" content="Cùng hội bạn thân đánh giá & chốt quán ăn trên bản đồ realtime!" />
+  <meta property="og:type" content="website" />
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['"Be Vietnam Pro"', 'sans-serif'] },
+          colors: {
+            brand: { DEFAULT: '#f97316', dark: '#ea6c0a', light: '#fdba74' },
+            surface: { DEFAULT: '#1e293b', card: '#273549', input: '#334155' },
+            success: '#22c55e',
+            warn: '#eab308',
+            danger: '#ef4444',
+          },
+          animation: {
+            'spin-slow': 'spin 3s linear infinite',
+            'bounce-soft': 'bounce 1s ease-in-out infinite',
+            'slide-up': 'slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            'fade-in': 'fadeIn 0.3s ease-out',
+            'pulse-ring': 'pulseRing 2s ease-out infinite',
+          },
+          keyframes: {
+            slideUp: { '0%': { transform: 'translateY(100%)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } },
+            fadeIn: { '0%': { opacity: '0', transform: 'scale(0.95)' }, '100%': { opacity: '1', transform: 'scale(1)' } },
+            pulseRing: {
+              '0%': { transform: 'scale(0.5)', opacity: '1' },
+              '100%': { transform: 'scale(2)', opacity: '0' },
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    * { -webkit-tap-highlight-color: transparent; }
+
+    body {
+      font-family: 'Be Vietnam Pro', sans-serif;
+      background: #0f172a;
+      overscroll-behavior: none;
+      height: 100dvh;
+      overflow: hidden;
+      color: #f1f5f9;
+    }
+
+    /* ── Map ── */
+    #map {
+      width: 100%;
+      height: 100dvh;
+      z-index: 1;
+      background: #0f172a;
+    }
+
+    /* Leaflet dark tile filter */
+    .leaflet-tile-pane { filter: brightness(0.85) saturate(0.9); }
+    .leaflet-control-attribution { display: none !important; }
+    .leaflet-control-zoom { display: none !important; }
+
+    /* ── Custom Markers ── */
+    .food-marker {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 20px 20px 20px 4px;
+      font-family: 'Be Vietnam Pro', sans-serif;
+      font-weight: 800;
+      font-size: 11px;
+      color: #fff;
+      padding: 5px 10px;
+      white-space: nowrap;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.4), 0 0 0 2px rgba(255,255,255,0.25);
+      cursor: pointer;
+      transition: transform 0.2s;
+      animation: markerPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .food-marker:hover { transform: scale(1.15); }
+    .food-marker .star-icon { margin-right: 3px; font-size: 10px; }
+    .food-marker.star-5 { background: linear-gradient(135deg, #16a34a, #22c55e); }
+    .food-marker.star-4 { background: linear-gradient(135deg, #ca8a04, #eab308); }
+    .food-marker.star-3 { background: linear-gradient(135deg, #d97706, #f59e0b); }
+    .food-marker.star-2 { background: linear-gradient(135deg, #dc2626, #ef4444); }
+    .food-marker.star-1 { background: linear-gradient(135deg, #9f1239, #ef4444); }
+
+    @keyframes markerPop {
+      0% { transform: scale(0) translateY(20px); opacity: 0; }
+      100% { transform: scale(1) translateY(0); opacity: 1; }
+    }
+
+    /* ── My Location Marker ── */
+    .my-location-marker {
+      width: 18px; height: 18px;
+      background: #3b82f6;
+      border-radius: 50%;
+      border: 3px solid #fff;
+      box-shadow: 0 2px 10px rgba(59,130,246,0.8);
+      position: relative;
+    }
+    .my-location-pulse {
+      position: absolute;
+      top: -8px; left: -8px;
+      width: 30px; height: 30px;
+      background: rgba(59,130,246,0.35);
+      border-radius: 50%;
+      animation: pulseRing 2s ease-out infinite;
+    }
+
+    /* ── FAB Buttons ── */
+    .fab {
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+      border: none;
+      outline: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .fab:active { transform: scale(0.9); }
+    .fab:hover { transform: scale(1.08); }
+
+    .fab-main {
+      width: 64px; height: 64px;
+      background: linear-gradient(135deg, #f97316, #fb923c);
+      box-shadow: 0 6px 25px rgba(249,115,22,0.5);
+    }
+
+    /* ── Bottom Sheet ── */
+    .bottom-sheet-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    .bottom-sheet-overlay.active { opacity: 1; pointer-events: all; }
+
+    .bottom-sheet {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: #1e293b;
+      border-radius: 24px 24px 0 0;
+      z-index: 1001;
+      transform: translateY(105%);
+      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      max-height: 92dvh;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding-bottom: env(safe-area-inset-bottom, 24px);
+    }
+    .bottom-sheet.active { transform: translateY(0); }
+
+    .bottom-sheet-handle {
+      width: 40px; height: 4px;
+      background: #475569;
+      border-radius: 2px;
+      margin: 12px auto 0;
+    }
+
+    /* ── Modals ── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      z-index: 2000;
+      display: flex; align-items: flex-end; justify-content: center;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    .modal-overlay.active { opacity: 1; pointer-events: all; }
+
+    .modal-card {
+      width: 100%; max-width: 480px;
+      background: #1e293b;
+      border-radius: 28px 28px 0 0;
+      transform: translateY(100%);
+      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      padding-bottom: env(safe-area-inset-bottom, 24px);
+      max-height: 95dvh;
+      overflow-y: auto;
+    }
+    .modal-card.active { transform: translateY(0); }
+
+    /* ── Star Picker ── */
+    .star-btn {
+      font-size: 32px;
+      cursor: pointer;
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+      filter: grayscale(1) opacity(0.4);
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .star-btn.active, .star-btn:hover { filter: grayscale(0) opacity(1); transform: scale(1.3); }
+
+    /* ── Custom Input Style ── */
+    .custom-input {
+      width: 100%;
+      background: #334155;
+      border: 2px solid #475569;
+      border-radius: 14px;
+      padding: 14px 16px;
+      color: #f1f5f9;
+      font-family: 'Be Vietnam Pro', sans-serif;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .custom-input:focus { border-color: #f97316; }
+    .custom-input::placeholder { color: #64748b; }
+
+    /* ── Toast ── */
+    #toast-container {
+      position: fixed; top: env(safe-area-inset-top, 16px);
+      left: 50%; transform: translateX(-50%);
+      z-index: 9999; display: flex; flex-direction: column; align-items: center; gap: 8px;
+      pointer-events: none; width: calc(100% - 32px); max-width: 360px;
+    }
+    .toast {
+      background: #1e293b;
+      border: 1px solid rgba(255,255,255,0.1);
+      color: #f1f5f9;
+      padding: 12px 18px;
+      border-radius: 14px;
+      font-size: 14px;
+      font-weight: 500;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+      animation: slideDownFade 0.3s ease-out;
+      text-align: center;
+      pointer-events: all;
+    }
+    @keyframes slideDownFade {
+      from { transform: translateY(-20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .toast.success { border-color: rgba(34,197,94,0.4); background: rgba(20,83,45,0.9); }
+    .toast.error { border-color: rgba(239,68,68,0.4); background: rgba(127,29,29,0.9); }
+    .toast.info { border-color: rgba(249,115,22,0.4); background: rgba(124,45,18,0.9); }
+
+    /* ── Spin Wheel ── */
+    #spin-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 3000;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 24px;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    #spin-overlay.active { opacity: 1; pointer-events: all; }
+
+    .spin-wheel {
+      width: 260px; height: 260px;
+      border-radius: 50%;
+      border: 6px solid rgba(249,115,22,0.5);
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+      background: conic-gradient(
+        #16a34a 0deg 60deg, #22c55e 60deg 120deg,
+        #ca8a04 120deg 180deg, #eab308 180deg 240deg,
+        #f97316 240deg 300deg, #fb923c 300deg 360deg
+      );
+      box-shadow: 0 0 60px rgba(249,115,22,0.4);
+    }
+    .spin-wheel-inner {
+      width: 100px; height: 100px;
+      background: #0f172a;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      border: 4px solid #1e293b;
+      font-size: 40px;
+    }
+    .spin-pointer {
+      position: absolute;
+      top: -18px; left: 50%;
+      transform: translateX(-50%);
+      font-size: 28px;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.8));
+    }
+
+    /* ── Header Bar ── */
+    #header-bar {
+      position: fixed;
+      top: env(safe-area-inset-top, 0);
+      left: 0; right: 0;
+      z-index: 100;
+      pointer-events: none;
+    }
+
+    /* ── Control Bar ── */
+    #control-bar {
+      position: fixed;
+      bottom: env(safe-area-inset-bottom, 0);
+      left: 0; right: 0;
+      z-index: 100;
+      padding: 0 16px 16px;
+    }
+
+    /* ── Login Screen ── */
+    #login-screen {
+      position: fixed; inset: 0;
+      background: linear-gradient(160deg, #0f172a 0%, #1e293b 40%, #0f172a 100%);
+      z-index: 5000;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 32px 24px;
+    }
+
+    /* ── Ripple ── */
+    .ripple-container { position: relative; overflow: hidden; }
+    .ripple {
+      position: absolute; border-radius: 50%;
+      transform: scale(0); animation: rippleAnim 0.6s linear;
+      background: rgba(255,255,255,0.25);
+      pointer-events: none;
+    }
+    @keyframes rippleAnim {
+      to { transform: scale(4); opacity: 0; }
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 2px; }
+
+    /* ── Rating stars display ── */
+    .rating-stars { color: #eab308; letter-spacing: 1px; }
+
+    /* ── Loading skeleton ── */
+    .skeleton {
+      background: linear-gradient(90deg, #273549 25%, #334155 50%, #273549 75%);
+      background-size: 200% 100%;
+      animation: skeleton 1.5s infinite;
+      border-radius: 8px;
+    }
+    @keyframes skeleton {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* ── Leaflet popup custom ── */
+    .leaflet-popup-content-wrapper {
+      background: #1e293b !important;
+      color: #f1f5f9 !important;
+      border-radius: 16px !important;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.5) !important;
+      border: 1px solid rgba(255,255,255,0.1) !important;
+    }
+    .leaflet-popup-tip-container { display: none; }
+    .leaflet-popup-close-button { color: #94a3b8 !important; top: 8px !important; right: 12px !important; font-size: 18px !important; }
+
+    /* ── Badge/chip ── */
+    .chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px; font-weight: 600;
+    }
+  </style>
+</head>
+<body class="h-full overflow-hidden">
+
+  <!-- ████████████████████  LOGIN SCREEN  ████████████████████ -->
+  <div id="login-screen">
+    <!-- Animated background orbs -->
+    <div class="absolute inset-0 overflow-hidden pointer-events-none">
+      <div class="absolute top-20 left-10 w-64 h-64 rounded-full opacity-20"
+           style="background: radial-gradient(circle, #f97316, transparent); animation: float 6s ease-in-out infinite;"></div>
+      <div class="absolute bottom-32 right-5 w-48 h-48 rounded-full opacity-15"
+           style="background: radial-gradient(circle, #22c55e, transparent); animation: float 8s ease-in-out infinite reverse;"></div>
+      <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full opacity-5"
+           style="background: radial-gradient(circle, #f97316, transparent);"></div>
+    </div>
+    <style>
+      @keyframes float {
+        0%, 100% { transform: translateY(0px) scale(1); }
+        50% { transform: translateY(-20px) scale(1.05); }
+      }
+    </style>
+
+    <!-- Logo -->
+    <div class="relative text-center mb-10">
+      <div class="w-24 h-24 mx-auto mb-5 flex items-center justify-center rounded-3xl shadow-2xl"
+           style="background: linear-gradient(135deg, #f97316, #fb923c); box-shadow: 0 20px 60px rgba(249,115,22,0.5);">
+        <span class="text-5xl">🍜</span>
+      </div>
+      <h1 class="text-4xl font-black tracking-tight text-white">FOOD DROP</h1>
+      <p class="text-slate-400 mt-2 text-sm font-medium tracking-widest uppercase">Bản đồ quán ăn hội bạn thân</p>
+    </div>
+
+    <!-- Feature pills -->
+    <div class="flex flex-wrap gap-2 justify-center mb-10">
+      <span class="chip" style="background:rgba(34,197,94,0.15); color:#22c55e; border:1px solid rgba(34,197,94,0.3);">📍 Realtime Map</span>
+      <span class="chip" style="background:rgba(234,179,8,0.15); color:#eab308; border:1px solid rgba(234,179,8,0.3);">⭐ Đánh giá quán</span>
+      <span class="chip" style="background:rgba(249,115,22,0.15); color:#f97316; border:1px solid rgba(249,115,22,0.3);">🎰 Chốt quán ngay</span>
+    </div>
+
+    <!-- Google Sign In Button -->
+    <button id="btn-google-login"
+      class="w-full max-w-xs flex items-center justify-center gap-3 py-4 px-6 rounded-2xl font-semibold text-base text-slate-800 shadow-2xl transition-all duration-200 active:scale-95"
+      style="background: linear-gradient(135deg, #fff, #f8fafc);">
+      <svg width="22" height="22" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+        <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/>
+        <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/>
+        <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/>
+        <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
+      </svg>
+      <span>Đăng nhập với Google</span>
+    </button>
+
+    <p class="text-slate-500 text-xs text-center mt-6 max-w-xs">
+      Bằng cách đăng nhập, bạn đồng ý chia sẻ vị trí GPS & đánh giá quán ăn với hội bạn của mình 🤝
+    </p>
+  </div>
+
+  <!-- ████████████████████  MAIN APP  ████████████████████ -->
+  <div id="main-app" class="hidden">
+
+    <!-- ── Map Container ── -->
+    <div id="map"></div>
+
+    <!-- ── Header Bar (top floating) ── -->
+    <div id="header-bar" class="px-4 pt-3">
+      <div class="flex items-center justify-between">
+        <!-- App Logo -->
+        <div class="flex items-center gap-2 bg-slate-900/80 backdrop-blur-xl rounded-2xl px-4 py-2.5 border border-slate-700/50 shadow-xl">
+          <span class="text-xl">🍜</span>
+          <span class="font-black text-white text-base tracking-tight">FOOD DROP</span>
+        </div>
+
+        <!-- User Avatar & review count -->
+        <div class="flex items-center gap-2">
+          <div class="bg-slate-900/80 backdrop-blur-xl rounded-2xl px-3 py-2.5 border border-slate-700/50 shadow-xl">
+            <span id="review-count-badge" class="text-xs font-bold text-brand">0 quán</span>
+          </div>
+          <button id="btn-user-avatar" class="w-11 h-11 rounded-2xl overflow-hidden border-2 border-brand shadow-xl bg-slate-800">
+            <img id="user-avatar-img" src="" alt="Avatar" class="w-full h-full object-cover hidden" />
+            <div id="user-avatar-fallback" class="w-full h-full flex items-center justify-center text-brand font-bold text-lg">?</div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Control Bar (bottom floating) ── -->
+    <div id="control-bar">
+      <div class="bg-slate-900/85 backdrop-blur-xl rounded-3xl border border-slate-700/50 shadow-2xl p-3">
+        <div class="flex items-center justify-around gap-2">
+
+          <!-- Locate Me Button -->
+          <button id="btn-locate" class="fab bg-slate-700/80 border border-slate-600/50" title="Về vị trí của tôi" aria-label="Về vị trí của tôi">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="text-sky-400">
+              <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8" stroke-opacity=".3"/>
+            </svg>
+          </button>
+
+          <!-- Add Review FAB (Main CTA) -->
+          <button id="btn-add-review" class="fab fab-main ripple-container" title="Thêm đánh giá quán" aria-label="Thêm quán mới">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+          </button>
+
+          <!-- Food Picker Button -->
+          <button id="btn-food-picker" class="fab bg-slate-700/80 border border-slate-600/50" title="Hôm nay ăn gì?" aria-label="Quay random quán ăn">
+            <span class="text-2xl">🎰</span>
+          </button>
+
+        </div>
+
+        <!-- GPS Status bar -->
+        <div class="flex items-center justify-center gap-2 mt-2">
+          <div id="gps-dot" class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></div>
+          <span id="gps-status-text" class="text-xs text-slate-400">Đang lấy GPS...</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /#main-app -->
+
+  <!-- ████████████████████  MODAL: ADD REVIEW  ████████████████████ -->
+  <div id="modal-add-review" class="modal-overlay" role="dialog" aria-modal="true" aria-label="Thêm đánh giá quán ăn">
+    <div id="modal-card-add" class="modal-card" style="padding-bottom: env(safe-area-inset-bottom, 24px);">
+      <div class="bottom-sheet-handle"></div>
+      <div class="px-5 pt-4 pb-6">
+
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-5">
+          <div>
+            <h2 class="text-xl font-black text-white">Thêm Quán Ăn 🍽️</h2>
+            <p id="modal-coords-label" class="text-xs text-slate-400 mt-0.5">Chọn vị trí trên bản đồ...</p>
+          </div>
+          <button id="btn-close-add-modal" class="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-slate-400" aria-label="Đóng">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <!-- Place Name Input -->
+        <div class="mb-4">
+          <label class="text-sm font-semibold text-slate-300 mb-2 block">Tên quán *</label>
+          <input id="input-place-name" type="text" class="custom-input" placeholder="VD: Phở Bò Hàng Đồng, Bánh Mì Bảo..." maxlength="60" autocomplete="off" />
+        </div>
+
+        <!-- Star Rating -->
+        <div class="mb-4">
+          <label class="text-sm font-semibold text-slate-300 mb-3 block">Số sao đánh giá *</label>
+          <div class="flex justify-center gap-3" id="star-picker" role="group" aria-label="Chọn số sao">
+            <button class="star-btn" data-star="1" aria-label="1 sao">⭐</button>
+            <button class="star-btn" data-star="2" aria-label="2 sao">⭐</button>
+            <button class="star-btn" data-star="3" aria-label="3 sao">⭐</button>
+            <button class="star-btn" data-star="4" aria-label="4 sao">⭐</button>
+            <button class="star-btn" data-star="5" aria-label="5 sao">⭐</button>
+          </div>
+          <p id="star-label-text" class="text-center text-slate-500 text-sm mt-2">Chưa chọn sao</p>
+        </div>
+
+        <!-- Note Input -->
+        <div class="mb-6">
+          <label class="text-sm font-semibold text-slate-300 mb-2 block">Ghi chú / Món nên thử</label>
+          <textarea id="input-note" class="custom-input resize-none" rows="3"
+            placeholder="VD: Phải order bún bò đặc biệt, ngồi tầng 2 view đẹp lắm..."></textarea>
+        </div>
+
+        <!-- Submit Button -->
+        <button id="btn-submit-review"
+          class="w-full py-4 rounded-2xl font-bold text-base text-white transition-all duration-200 active:scale-95 flex items-center justify-center gap-2"
+          style="background: linear-gradient(135deg, #f97316, #fb923c); box-shadow: 0 8px 25px rgba(249,115,22,0.4);">
+          <span id="btn-submit-text">Ghim quán lên bản đồ 📍</span>
+          <div id="btn-submit-spinner" class="hidden w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+        </button>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ████████████████████  BOTTOM SHEET: REVIEW DETAIL  ████████████████████ -->
+  <div id="overlay-review-detail" class="bottom-sheet-overlay" aria-hidden="true">
+    <div id="sheet-review-detail" class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Chi tiết đánh giá quán">
+      <div class="bottom-sheet-handle"></div>
+      <div class="px-5 pt-4 pb-6" id="review-detail-content">
+        <!-- Dynamic content injected by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ████████████████████  SPIN WHEEL OVERLAY  ████████████████████ -->
+  <div id="spin-overlay" aria-label="Quay chọn quán ăn" role="dialog">
+    <!-- Close button -->
+    <button id="btn-close-spin"
+      class="absolute top-4 right-4 w-10 h-10 rounded-full bg-slate-700/80 flex items-center justify-center text-slate-400 z-10">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+
+    <div class="text-center mb-8">
+      <p class="text-slate-400 text-sm font-medium tracking-widest uppercase mb-1">Hôm Nay Ăn Gì?</p>
+      <h2 class="text-3xl font-black text-white">🎰 Vòng Quay Chốt Quán</h2>
+    </div>
+
+    <!-- Wheel -->
+    <div class="relative mb-8">
+      <div class="spin-pointer">▼</div>
+      <div id="spin-wheel" class="spin-wheel">
+        <div class="spin-wheel-inner" id="spin-icon">🍜</div>
+      </div>
+    </div>
+
+    <!-- Status text -->
+    <div id="spin-status" class="text-center mb-8 min-h-[70px] flex flex-col items-center justify-center">
+      <p id="spin-loading-text" class="text-slate-400">Đang tìm quán 4-5⭐ gần bạn...</p>
+      <div id="spin-candidates-count" class="hidden mt-2">
+        <span id="spin-count-num" class="text-4xl font-black text-brand"></span>
+        <span class="text-slate-400 ml-1">quán phù hợp</span>
+      </div>
+    </div>
+
+    <!-- Winner card -->
+    <div id="spin-winner" class="hidden w-full max-w-xs mx-auto">
+      <div class="rounded-3xl p-5 border border-slate-600/50 text-center"
+           style="background: linear-gradient(135deg, rgba(249,115,22,0.15), rgba(251,146,60,0.1));">
+        <div class="text-4xl mb-3" id="spin-winner-emoji">🎉</div>
+        <p class="text-slate-400 text-xs font-semibold tracking-widest uppercase mb-1">Hôm nay hội đi</p>
+        <h3 id="spin-winner-name" class="text-2xl font-black text-white mb-2"></h3>
+        <div id="spin-winner-stars" class="rating-stars text-2xl mb-3"></div>
+        <p id="spin-winner-note" class="text-slate-400 text-sm"></p>
+        <button id="btn-go-to-winner"
+          class="mt-4 w-full py-3 rounded-xl font-bold text-sm text-white"
+          style="background: linear-gradient(135deg, #f97316, #fb923c);">
+          📍 Xem trên bản đồ
+        </button>
+      </div>
+    </div>
+
+    <!-- Spin button -->
+    <button id="btn-spin-go" class="hidden mt-6 py-4 px-8 rounded-2xl font-bold text-base text-white"
+      style="background: linear-gradient(135deg, #f97316, #fb923c); box-shadow: 0 8px 25px rgba(249,115,22,0.4);">
+      🎲 Quay thôi!
+    </button>
+
+    <!-- No restaurants message -->
+    <div id="spin-empty" class="hidden text-center">
+      <div class="text-5xl mb-4">😅</div>
+      <p class="text-white font-bold text-lg mb-2">Chưa có quán 4-5⭐ gần đây!</p>
+      <p class="text-slate-400 text-sm">Hãy thêm quán ăn ngon vào bản đồ trước nhé.</p>
+    </div>
+  </div>
+
+  <!-- ████████████████████  TOAST CONTAINER  ████████████████████ -->
+  <div id="toast-container" role="status" aria-live="polite"></div>
+
+  <!-- ████████████████████  SCRIPTS  ████████████████████ -->
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WLs=" crossorigin=""></script>
+
+  <!-- Firebase SDK v10 (Modular - compat mode for CDN) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+  <!-- Main App Logic -->
+  <script src="./app.js"></script>
+
+</body>
+</html>
