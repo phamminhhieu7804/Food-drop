@@ -51,32 +51,24 @@ const FIREBASE_CONFIG = {
 };
 ```
 
-### Bước 3: Cấu hình Firestore Security Rules
+### Bước 3: Thêm Firestore Security Rules
 
-Vào **Firestore** → **Rules** → Paste:
+> ℹ️ App v2.0 không dùng Firebase Auth nữa, dùng rules mở cho nhóm bạn:
 
 ```
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Users: chỉ đọc/ghi của chính mình
-    match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
-    }
-    
-    // Reviews: đọc tất cả, viết khi đăng nhập, xóa của chính mình
-    match /reviews/{reviewId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null 
-                    && request.resource.data.userId == request.auth.uid;
-      allow delete: if request.auth != null 
-                    && resource.data.userId == request.auth.uid;
+    // Mở hoàn toàn cho hội bạn thân (không cần đăng nhập Firebase)
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }
 ```
+
+> ⚠️ **LƯU Ý BẢO MẬT**: Rules này mở hoàn toàn, chỉ phù hợp cho nhóm bạn tin cậy.
+> Nếu cần bảo vệ hơn, thêm check theo `userId` (UID tự generate của app).
 
 ### Bước 4: Deploy và chạy
 

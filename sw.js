@@ -3,19 +3,22 @@
 // Caches static assets for offline/fast loading
 // =============================================
 
-const CACHE_NAME = 'food-drop-v1.2';
+const CACHE_NAME = 'food-drop-v3.1';
 const STATIC_ASSETS = [
   './',
   './index.html',
   './app.js',
   './manifest.json',
-  // Leaflet CSS & JS (cached from CDN on first load)
+  // Leaflet
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+  // QR libs
+  'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js',
+  'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js',
   // Tailwind CDN
   'https://cdn.tailwindcss.com',
-  // Google Fonts
-  'https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800&display=swap'
+  // Fonts
+  'https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800;900&display=swap'
 ];
 
 // ── Install: cache tất cả static assets ──

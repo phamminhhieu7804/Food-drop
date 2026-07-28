@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+</head>
+<body>
+<canvas id="target"></canvas>
+<script>
+  async function renderGradientQR(targetCanvas, data) {
+    const SZ = 250;
+    const rawC = document.createElement('canvas');
+    await new Promise((res, rej) => {
+      QRCode.toCanvas(rawC, data, {
+        errorCorrectionLevel: 'H',
+        color: { dark: '#0f172a', light: '#ffffff' },
+        width: SZ, margin: 2,
+      }, e => e ? rej(e) : res());
+    });
+    
+    // Test if we get here
+    console.log("QRCode created successfully");
+    const dc = rawC.getContext('2d');
+    console.log(dc.getImageData(0,0,1,1));
+    targetCanvas.getContext('2d').drawImage(rawC, 0, 0);
+  }
+
+  const data = JSON.stringify({ app: 'FOODDROP_v3', uid: 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx', name: 'NgonFoodie#2847', ts: Date.now() });
+  
+  renderGradientQR(document.getElementById('target'), data)
+    .catch(e => {
+       document.body.innerHTML += `<div style="color:red">ERROR: ${e.message || e}</div>`;
+    });
+</script>
+</body>
+</html>

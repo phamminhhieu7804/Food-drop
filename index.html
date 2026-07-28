@@ -8,656 +8,838 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="FOOD DROP" />
   <meta name="theme-color" content="#f97316" />
-  <meta name="description" content="Bản đồ đánh giá & săn quán ăn dành cho hội bạn thân. Cùng nhau chốt quán, không còn câu hỏi 'ăn gì hôm nay?'" />
-
-  <!-- SEO -->
-  <title>FOOD DROP 🍜 - Bản đồ Quán Ăn Hội Bạn Thân</title>
-  <meta property="og:title" content="FOOD DROP - Bản đồ đánh giá quán ăn" />
-  <meta property="og:description" content="Cùng hội bạn thân đánh giá & chốt quán ăn trên bản đồ realtime!" />
-  <meta property="og:type" content="website" />
-
-  <!-- PWA Manifest -->
+  <meta name="description" content="Bản đồ đánh giá & săn quán ăn dành cho hội bạn thân" />
+  <title>FOOD DROP 🍜</title>
   <link rel="manifest" href="./manifest.json" />
   <link rel="apple-touch-icon" href="./icons/icon-192.png" />
-
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-
-  <!-- Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
-
-  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: { sans: ['"Be Vietnam Pro"', 'sans-serif'] },
-          colors: {
-            brand: { DEFAULT: '#f97316', dark: '#ea6c0a', light: '#fdba74' },
-            surface: { DEFAULT: '#1e293b', card: '#273549', input: '#334155' },
-            success: '#22c55e',
-            warn: '#eab308',
-            danger: '#ef4444',
-          },
-          animation: {
-            'spin-slow': 'spin 3s linear infinite',
-            'bounce-soft': 'bounce 1s ease-in-out infinite',
-            'slide-up': 'slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
-            'fade-in': 'fadeIn 0.3s ease-out',
-            'pulse-ring': 'pulseRing 2s ease-out infinite',
-          },
-          keyframes: {
-            slideUp: { '0%': { transform: 'translateY(100%)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } },
-            fadeIn: { '0%': { opacity: '0', transform: 'scale(0.95)' }, '100%': { opacity: '1', transform: 'scale(1)' } },
-            pulseRing: {
-              '0%': { transform: 'scale(0.5)', opacity: '1' },
-              '100%': { transform: 'scale(2)', opacity: '0' },
-            }
-          }
-        }
-      }
+      theme: { extend: {
+        fontFamily: { sans: ['"Be Vietnam Pro"', 'sans-serif'] },
+        colors: { brand: '#f97316' },
+      }}
     };
   </script>
 
-  <style>
-    * { -webkit-tap-highlight-color: transparent; }
+<style>
+  * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+  body {
+    font-family: 'Be Vietnam Pro', sans-serif;
+    background: #0f172a; height: 100dvh; overflow: hidden;
+    color: #f1f5f9; overscroll-behavior: none;
+  }
 
-    body {
-      font-family: 'Be Vietnam Pro', sans-serif;
-      background: #0f172a;
-      overscroll-behavior: none;
-      height: 100dvh;
-      overflow: hidden;
-      color: #f1f5f9;
-    }
+  /* ── MAP ── */
+  #map { width:100%; height:100dvh; z-index:1; background:#0f172a; }
+  .leaflet-tile-pane { filter: brightness(0.82) saturate(0.85); }
+  .leaflet-control-attribution, .leaflet-control-zoom { display:none !important; }
 
-    /* ── Map ── */
-    #map {
-      width: 100%;
-      height: 100dvh;
-      z-index: 1;
-      background: #0f172a;
-    }
+  /* ── REVIEW MARKERS ── */
+  .food-marker {
+    display:flex; align-items:center; border-radius:20px; transform: translateX(-50%);
+    font-family:'Be Vietnam Pro',sans-serif; font-weight:800; font-size:11px; color:#fff;
+    padding:5px 10px; white-space:nowrap; cursor:pointer;
+    box-shadow:0 4px 15px rgba(0,0,0,.4), 0 0 0 2px rgba(255,255,255,.2);
+    animation:markerPop .35s cubic-bezier(.34,1.56,.64,1);
+    transition:transform .15s; user-select:none;
+  }
+  .food-marker:hover { transform: translateX(-50%) scale(1.12); }
+  .food-marker.star-5 { background:linear-gradient(135deg,#16a34a,#22c55e); }
+  .food-marker.star-4 { background:linear-gradient(135deg,#ca8a04,#eab308); }
+  .food-marker.star-3 { background:linear-gradient(135deg,#d97706,#f59e0b); }
+  .food-marker.star-2 { background:linear-gradient(135deg,#dc2626,#ef4444); }
+  .food-marker.star-1 { background:linear-gradient(135deg,#9f1239,#ef4444); }
+  @keyframes markerPop { 0%{transform: translateX(-50%) scale(0) translateY(16px);opacity:0} 100%{transform: translateX(-50%) scale(1);opacity:1} }
 
-    /* Leaflet dark tile filter */
-    .leaflet-tile-pane { filter: brightness(0.85) saturate(0.9); }
-    .leaflet-control-attribution { display: none !important; }
-    .leaflet-control-zoom { display: none !important; }
+  /* ── USER AVATAR MARKERS ── */
+  
+  
+  .user-avatar-marker {
+    width:46px; height:46px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-weight:900; font-size:18px; color:#fff;
+    border:3px solid rgba(255,255,255,.3);
+    box-shadow:0 0 0 3px rgba(255,255,255,.15), 0 6px 20px rgba(0,0,0,.5);
+    cursor:pointer; position:relative;
+    animation:avatarPop .4s cubic-bezier(.34,1.56,.64,1);
+    transition:transform .2s; user-select:none;
+  }
+  .user-avatar-marker:hover { transform:scale(1.18); }
+  .user-avatar-ring {
+    position:absolute; inset:-8px; border-radius:50%;
+    border:2px solid currentColor; opacity:.4;
+    animation:ringPulse 2s ease-out infinite;
+  }
+  @keyframes avatarPop { 0%{transform:scale(0);opacity:0} 100%{transform:scale(1);opacity:1} }
+  @keyframes ringPulse { 0%{transform:scale(.8);opacity:.6} 100%{transform:scale(1.8);opacity:0} }
 
-    /* ── Custom Markers ── */
-    .food-marker {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 20px 20px 20px 4px;
-      font-family: 'Be Vietnam Pro', sans-serif;
-      font-weight: 800;
-      font-size: 11px;
-      color: #fff;
-      padding: 5px 10px;
-      white-space: nowrap;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.4), 0 0 0 2px rgba(255,255,255,0.25);
-      cursor: pointer;
-      transition: transform 0.2s;
-      animation: markerPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-      user-select: none;
-      -webkit-user-select: none;
-    }
-    .food-marker:hover { transform: scale(1.15); }
-    .food-marker .star-icon { margin-right: 3px; font-size: 10px; }
-    .food-marker.star-5 { background: linear-gradient(135deg, #16a34a, #22c55e); }
-    .food-marker.star-4 { background: linear-gradient(135deg, #ca8a04, #eab308); }
-    .food-marker.star-3 { background: linear-gradient(135deg, #d97706, #f59e0b); }
-    .food-marker.star-2 { background: linear-gradient(135deg, #dc2626, #ef4444); }
-    .food-marker.star-1 { background: linear-gradient(135deg, #9f1239, #ef4444); }
+  /* ── MY LOCATION ── */
+  .my-location-dot {
+    width:16px; height:16px; background:#3b82f6; border-radius:50%;
+    border:3px solid #fff; box-shadow:0 2px 10px rgba(59,130,246,.8);
+    position:relative;
+  }
+  .my-location-pulse {
+    position:absolute; top:-8px; left:-8px; width:28px; height:28px;
+    background:rgba(59,130,246,.3); border-radius:50%;
+    animation:pulseRing 2s ease-out infinite;
+  }
+  @keyframes pulseRing { 0%{transform:scale(.5);opacity:1} 100%{transform:scale(2);opacity:0} }
 
-    @keyframes markerPop {
-      0% { transform: scale(0) translateY(20px); opacity: 0; }
-      100% { transform: scale(1) translateY(0); opacity: 1; }
-    }
+  /* ── FABs ── */
+  .fab {
+    border-radius:50%; display:flex; align-items:center; justify-content:center;
+    cursor:pointer; border:none; outline:none;
+    box-shadow:0 4px 20px rgba(0,0,0,.4);
+    transition:all .2s cubic-bezier(.34,1.56,.64,1);
+    user-select:none; -webkit-user-select:none;
+  }
+  .fab:active { transform:scale(.88); }
+  .fab:hover  { transform:scale(1.08); }
 
-    /* ── My Location Marker ── */
-    .my-location-marker {
-      width: 18px; height: 18px;
-      background: #3b82f6;
-      border-radius: 50%;
-      border: 3px solid #fff;
-      box-shadow: 0 2px 10px rgba(59,130,246,0.8);
-      position: relative;
-    }
-    .my-location-pulse {
-      position: absolute;
-      top: -8px; left: -8px;
-      width: 30px; height: 30px;
-      background: rgba(59,130,246,0.35);
-      border-radius: 50%;
-      animation: pulseRing 2s ease-out infinite;
-    }
+  /* ── BOTTOM SHEETS ── */
+  .bs-overlay {
+    position:fixed; inset:0; background:rgba(0,0,0,.6);
+    backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);
+    z-index:1000; opacity:0; pointer-events:none; transition:opacity .3s;
+  }
+  .bs-overlay.open { opacity:1; pointer-events:all; }
+  .bs-panel {
+    position:fixed; bottom:0; left:0; right:0;
+    background:#1e293b; border-radius:26px 26px 0 0;
+    z-index:1001; transform:translateY(106%);
+    transition:transform .4s cubic-bezier(.34,1.56,.64,1);
+    max-height:92dvh; overflow-y:auto; overscroll-behavior:contain;
+    padding-bottom:env(safe-area-inset-bottom,20px);
+  }
+  .bs-panel.open { transform:translateY(0); }
+  .bs-handle { width:38px; height:4px; background:#475569; border-radius:2px; margin:12px auto 0; }
 
-    /* ── FAB Buttons ── */
-    .fab {
-      width: 52px; height: 52px;
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer;
-      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-      border: none;
-      outline: none;
-      user-select: none;
-      -webkit-user-select: none;
-    }
-    .fab:active { transform: scale(0.9); }
-    .fab:hover { transform: scale(1.08); }
+  /* ── MODAL OVERLAY ── */
+  .modal-ov {
+    position:fixed; inset:0; background:rgba(0,0,0,.72);
+    backdrop-filter:blur(7px); -webkit-backdrop-filter:blur(7px);
+    z-index:2000; display:flex; align-items:flex-end; justify-content:center;
+    opacity:0; pointer-events:none; transition:opacity .3s;
+  }
+  .modal-ov.open { opacity:1; pointer-events:all; }
+  .modal-panel {
+    width:100%; max-width:480px; background:#1e293b;
+    border-radius:28px 28px 0 0; transform:translateY(100%);
+    transition:transform .4s cubic-bezier(.34,1.56,.64,1);
+    max-height:94dvh; overflow-y:auto;
+    padding-bottom:env(safe-area-inset-bottom,20px);
+  }
+  .modal-panel.open { transform:translateY(0); }
 
-    .fab-main {
-      width: 64px; height: 64px;
-      background: linear-gradient(135deg, #f97316, #fb923c);
-      box-shadow: 0 6px 25px rgba(249,115,22,0.5);
-    }
+  /* ── FULLSCREEN MODAL (Add Friend camera) ── */
+  .fs-modal {
+    position:fixed; inset:0; background:#0f172a;
+    z-index:3500; display:flex; flex-direction:column;
+    align-items:center; padding:0 20px 24px;
+    padding-top:env(safe-area-inset-top,16px);
+    opacity:0; pointer-events:none; transition:opacity .3s;
+    overflow-y:auto;
+  }
+  .fs-modal.open { opacity:1; pointer-events:all; }
 
-    /* ── Bottom Sheet ── */
-    .bottom-sheet-overlay {
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.6);
-      backdrop-filter: blur(4px);
-      -webkit-backdrop-filter: blur(4px);
-      z-index: 1000;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.3s;
-    }
-    .bottom-sheet-overlay.active { opacity: 1; pointer-events: all; }
+  /* ── LOGIN SCREEN ── */
+  #login-screen {
+    position:fixed; inset:0; background:#0f172a;
+    z-index:5000; display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    overflow:hidden;
+    padding:env(safe-area-inset-top,0) 24px env(safe-area-inset-bottom,0);
+  }
+  .ls-sub {
+    width:100%; max-width:400px;
+    display:flex; flex-direction:column; align-items:center;
+    animation:lsFadeIn .3s ease-out;
+  }
+  @keyframes lsFadeIn { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:none} }
 
-    .bottom-sheet {
-      position: fixed;
-      bottom: 0; left: 0; right: 0;
-      background: #1e293b;
-      border-radius: 24px 24px 0 0;
-      z-index: 1001;
-      transform: translateY(105%);
-      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-      max-height: 92dvh;
-      overflow-y: auto;
-      overscroll-behavior: contain;
-      padding-bottom: env(safe-area-inset-bottom, 24px);
-    }
-    .bottom-sheet.active { transform: translateY(0); }
+  /* Orb backgrounds */
+  .orb { position:absolute; border-radius:50%; filter:blur(70px); pointer-events:none; }
+  .orb-a { width:320px;height:320px;top:-80px;right:-80px;background:rgba(249,115,22,.2);animation:orbFloat 7s ease-in-out infinite; }
+  .orb-b { width:220px;height:220px;bottom:80px;left:-50px;background:rgba(168,85,247,.15);animation:orbFloat 9s ease-in-out infinite reverse 1s; }
+  .orb-c { width:180px;height:180px;top:45%;right:5%;background:rgba(6,182,212,.12);animation:orbFloat 11s ease-in-out infinite 2s; }
+  @keyframes orbFloat { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-18px) scale(1.04)} }
 
-    .bottom-sheet-handle {
-      width: 40px; height: 4px;
-      background: #475569;
-      border-radius: 2px;
-      margin: 12px auto 0;
-    }
+  /* Auth action cards */
+  .auth-card {
+    width:100%; display:flex; align-items:center; gap:16px;
+    padding:18px 20px; border-radius:22px; cursor:pointer;
+    transition:all .22s cubic-bezier(.34,1.56,.64,1);
+    border:1.5px solid; user-select:none; -webkit-user-select:none; text-align:left;
+  }
+  .auth-card:active { transform:scale(.97); }
+  .auth-card.primary { background:rgba(249,115,22,.14); border-color:rgba(249,115,22,.4); }
+  .auth-card.secondary { background:rgba(255,255,255,.04); border-color:rgba(255,255,255,.08); }
+  .auth-icon {
+    width:54px; height:54px; border-radius:16px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; font-size:26px;
+  }
+  .primary .auth-icon { background:linear-gradient(135deg,#f97316,#fb923c); box-shadow:0 6px 20px rgba(249,115,22,.4); }
+  .secondary .auth-icon { background:rgba(100,116,139,.18); border:1.5px solid rgba(100,116,139,.3); }
 
-    /* ── Modals ── */
-    .modal-overlay {
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.7);
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-      z-index: 2000;
-      display: flex; align-items: flex-end; justify-content: center;
-      opacity: 0; pointer-events: none;
-      transition: opacity 0.3s;
-    }
-    .modal-overlay.active { opacity: 1; pointer-events: all; }
+  /* Back button */
+  .btn-back {
+    display:flex; align-items:center; gap:6px; color:#94a3b8;
+    font-size:14px; font-weight:600; padding:8px 4px;
+    cursor:pointer; border:none; background:none; transition:color .2s;
+  }
+  .btn-back:hover { color:#f1f5f9; }
 
-    .modal-card {
-      width: 100%; max-width: 480px;
-      background: #1e293b;
-      border-radius: 28px 28px 0 0;
-      transform: translateY(100%);
-      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-      padding-bottom: env(safe-area-inset-bottom, 24px);
-      max-height: 95dvh;
-      overflow-y: auto;
-    }
-    .modal-card.active { transform: translateY(0); }
+  /* ── QR GLOW CARD ── */
+  .qr-glow-wrap {
+    position:relative; border-radius:28px; padding:3px;
+    background:linear-gradient(135deg,#f97316,#c026d3,#2563eb,#f97316);
+    background-size:300% 300%;
+    animation:gradShift 4s ease infinite;
+    box-shadow:0 0 50px rgba(249,115,22,.3), 0 20px 60px rgba(0,0,0,.5);
+  }
+  @keyframes gradShift { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+  .qr-glow-inner {
+    background:#1e293b; border-radius:26px; padding:20px;
+    display:flex; flex-direction:column; align-items:center;
+  }
 
-    /* ── Star Picker ── */
-    .star-btn {
-      font-size: 32px;
-      cursor: pointer;
-      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-      filter: grayscale(1) opacity(0.4);
-      user-select: none;
-      -webkit-user-select: none;
-    }
-    .star-btn.active, .star-btn:hover { filter: grayscale(0) opacity(1); transform: scale(1.3); }
+  /* Gradient QR canvas */
+  #qr-login-canvas, #my-profile-qr-canvas, #user-profile-qr-canvas { border-radius:12px; display:block; }
 
-    /* ── Custom Input Style ── */
-    .custom-input {
-      width: 100%;
-      background: #334155;
-      border: 2px solid #475569;
-      border-radius: 14px;
-      padding: 14px 16px;
-      color: #f1f5f9;
-      font-family: 'Be Vietnam Pro', sans-serif;
-      font-size: 15px;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-    .custom-input:focus { border-color: #f97316; }
-    .custom-input::placeholder { color: #64748b; }
+  /* ── QR Upload Zone ── */
+  .upload-zone {
+    width:100%; border:2px dashed rgba(249,115,22,.4);
+    border-radius:22px; padding:36px 20px;
+    display:flex; flex-direction:column; align-items:center; gap:10px;
+    cursor:pointer; transition:all .2s;
+    background:rgba(249,115,22,.05);
+    user-select:none; -webkit-user-select:none;
+  }
+  .upload-zone:hover, .upload-zone:active {
+    border-color:#f97316; background:rgba(249,115,22,.12);
+    transform:scale(1.02);
+  }
+  .upload-zone-icon { font-size:44px; line-height:1; }
 
-    /* ── Toast ── */
-    #toast-container {
-      position: fixed; top: env(safe-area-inset-top, 16px);
-      left: 50%; transform: translateX(-50%);
-      z-index: 9999; display: flex; flex-direction: column; align-items: center; gap: 8px;
-      pointer-events: none; width: calc(100% - 32px); max-width: 360px;
-    }
-    .toast {
-      background: #1e293b;
-      border: 1px solid rgba(255,255,255,0.1);
-      color: #f1f5f9;
-      padding: 12px 18px;
-      border-radius: 14px;
-      font-size: 14px;
-      font-weight: 500;
-      box-shadow: 0 8px 30px rgba(0,0,0,0.5);
-      animation: slideDownFade 0.3s ease-out;
-      text-align: center;
-      pointer-events: all;
-    }
-    @keyframes slideDownFade {
-      from { transform: translateY(-20px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
-    .toast.success { border-color: rgba(34,197,94,0.4); background: rgba(20,83,45,0.9); }
-    .toast.error { border-color: rgba(239,68,68,0.4); background: rgba(127,29,29,0.9); }
-    .toast.info { border-color: rgba(249,115,22,0.4); background: rgba(124,45,18,0.9); }
+  /* ── OR Divider ── */
+  .or-divider {
+    display:flex; align-items:center; gap:12px; width:100%;
+    color:#475569; font-size:12px; font-weight:700;
+  }
+  .or-divider::before, .or-divider::after {
+    content:''; flex:1; height:1px; background:rgba(255,255,255,.08);
+  }
 
-    /* ── Spin Wheel ── */
-    #spin-overlay {
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.85);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      z-index: 3000;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      padding: 24px;
-      opacity: 0; pointer-events: none;
-      transition: opacity 0.3s;
-    }
-    #spin-overlay.active { opacity: 1; pointer-events: all; }
+  /* ── Star Picker ── */
+  .star-btn {
+    font-size:32px; cursor:pointer;
+    transition:transform .2s cubic-bezier(.34,1.56,.64,1);
+    filter:grayscale(1) opacity(.35); user-select:none;
+  }
+  .star-btn.active, .star-btn:hover { filter:none; transform:scale(1.3); }
 
-    .spin-wheel {
-      width: 260px; height: 260px;
-      border-radius: 50%;
-      border: 6px solid rgba(249,115,22,0.5);
-      display: flex; align-items: center; justify-content: center;
-      position: relative;
-      background: conic-gradient(
-        #16a34a 0deg 60deg, #22c55e 60deg 120deg,
-        #ca8a04 120deg 180deg, #eab308 180deg 240deg,
-        #f97316 240deg 300deg, #fb923c 300deg 360deg
-      );
-      box-shadow: 0 0 60px rgba(249,115,22,0.4);
-    }
-    .spin-wheel-inner {
-      width: 100px; height: 100px;
-      background: #0f172a;
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      border: 4px solid #1e293b;
-      font-size: 40px;
-    }
-    .spin-pointer {
-      position: absolute;
-      top: -18px; left: 50%;
-      transform: translateX(-50%);
-      font-size: 28px;
-      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.8));
-    }
+  /* ── Inputs ── */
+  .c-input {
+    width:100%; background:#334155; border:2px solid #475569;
+    border-radius:14px; padding:14px 16px; color:#f1f5f9;
+    font-family:'Be Vietnam Pro',sans-serif; font-size:15px;
+    outline:none; transition:border-color .2s;
+  }
+  .c-input:focus { border-color:#f97316; }
+  .c-input::placeholder { color:#64748b; }
 
-    /* ── Header Bar ── */
-    #header-bar {
-      position: fixed;
-      top: env(safe-area-inset-top, 0);
-      left: 0; right: 0;
-      z-index: 100;
-      pointer-events: none;
-    }
+  /* ── QR Scanner (shared) ── */
+  .scanner-box {
+    position:relative; width:100%; max-width:300px;
+    aspect-ratio:1; border-radius:22px; overflow:hidden; background:#000;
+    flex-shrink:0;
+  }
+  .scanner-box video { width:100%; height:100%; object-fit:cover; display:block; }
+  .scan-overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  .scan-zone { width:65%; height:65%; position:relative; border-radius:10px; box-shadow:0 0 0 1000px rgba(0,0,0,.52); }
+  .sc { position:absolute; width:22px; height:22px; border-color:#f97316; border-style:solid; }
+  .sc.tl{top:-1px;left:-1px;border-width:3px 0 0 3px;border-radius:6px 0 0 0;}
+  .sc.tr{top:-1px;right:-1px;border-width:3px 3px 0 0;border-radius:0 6px 0 0;}
+  .sc.bl{bottom:-1px;left:-1px;border-width:0 0 3px 3px;border-radius:0 0 0 6px;}
+  .sc.br{bottom:-1px;right:-1px;border-width:0 3px 3px 0;border-radius:0 0 6px 0;}
+  .scan-line {
+    position:absolute; left:0; right:0; height:2px;
+    background:linear-gradient(90deg,transparent,#f97316 30%,#fb923c 50%,#f97316 70%,transparent);
+    animation:scanMove 2s ease-in-out infinite; border-radius:1px;
+  }
+  @keyframes scanMove { 0%{top:3%;opacity:0} 10%{opacity:1} 90%{opacity:1} 100%{top:97%;opacity:0} }
 
-    /* ── Control Bar ── */
-    #control-bar {
-      position: fixed;
-      bottom: env(safe-area-inset-bottom, 0);
-      left: 0; right: 0;
-      z-index: 100;
-      padding: 0 16px 16px;
-    }
+  /* ── Spin Wheel ── */
+  #spin-overlay {
+    position:fixed; inset:0; background:rgba(0,0,0,.87);
+    backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+    z-index:3000; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; padding:24px; opacity:0; pointer-events:none; transition:opacity .3s;
+  }
+  #spin-overlay.open { opacity:1; pointer-events:all; }
+  .spin-wheel {
+    width:250px; height:250px; border-radius:50%;
+    background:conic-gradient(#16a34a 0 60deg,#22c55e 60deg 120deg,#ca8a04 120deg 180deg,#eab308 180deg 240deg,#f97316 240deg 300deg,#fb923c 300deg 360deg);
+    border:6px solid rgba(249,115,22,.4); display:flex; align-items:center; justify-content:center;
+    position:relative; box-shadow:0 0 60px rgba(249,115,22,.35);
+  }
+  .spin-center { width:90px; height:90px; background:#0f172a; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:38px; border:4px solid #1e293b; }
+  .spin-ptr { position:absolute; top:-18px; left:50%; transform:translateX(-50%); font-size:26px; filter:drop-shadow(0 2px 6px rgba(0,0,0,.8)); }
 
-    /* ── Login Screen ── */
-    #login-screen {
-      position: fixed; inset: 0;
-      background: linear-gradient(160deg, #0f172a 0%, #1e293b 40%, #0f172a 100%);
-      z-index: 5000;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      padding: 32px 24px;
-    }
+  /* ── Toast ── */
+  #toast-wrap {
+    position:fixed; top:env(safe-area-inset-top,14px); left:50%; transform:translateX(-50%);
+    z-index:9999; display:flex; flex-direction:column; align-items:center; gap:8px;
+    pointer-events:none; width:calc(100% - 28px); max-width:360px;
+  }
+  .toast {
+    background:#1e293b; border:1px solid rgba(255,255,255,.1); color:#f1f5f9;
+    padding:12px 18px; border-radius:14px; font-size:14px; font-weight:500;
+    box-shadow:0 8px 30px rgba(0,0,0,.5); animation:toastIn .3s ease-out; text-align:center;
+  }
+  @keyframes toastIn { from{transform:translateY(-16px);opacity:0} to{transform:none;opacity:1} }
+  .toast.ok   { border-color:rgba(34,197,94,.4); background:rgba(20,83,45,.9); }
+  .toast.err  { border-color:rgba(239,68,68,.4); background:rgba(127,29,29,.9); }
+  .toast.info { border-color:rgba(249,115,22,.4); background:rgba(124,45,18,.9); }
 
-    /* ── Ripple ── */
-    .ripple-container { position: relative; overflow: hidden; }
-    .ripple {
-      position: absolute; border-radius: 50%;
-      transform: scale(0); animation: rippleAnim 0.6s linear;
-      background: rgba(255,255,255,0.25);
-      pointer-events: none;
-    }
-    @keyframes rippleAnim {
-      to { transform: scale(4); opacity: 0; }
-    }
+  /* ── Header & Controls ── */
+  #header-bar { position:fixed; top:env(safe-area-inset-top,0); left:0; right:0; z-index:100; pointer-events:none; }
+  #control-bar { position:fixed; bottom:env(safe-area-inset-bottom,0); left:0; right:0; z-index:100; padding:0 16px 16px; }
 
-    /* ── Scrollbar ── */
-    ::-webkit-scrollbar { width: 4px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 2px; }
+  /* ── Friend items ── */
+  .friend-req-item { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,.06); }
+  .friend-item { display:flex; align-items:center; gap:10px; padding:8px 0; }
+  .avatar-circle {
+    width:38px; height:38px; border-radius:50%; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    font-weight:900; font-size:15px; color:#fff;
+  }
 
-    /* ── Rating stars display ── */
-    .rating-stars { color: #eab308; letter-spacing: 1px; }
+  /* ── Misc ── */
+  .rounding { border-radius:14px; }
+  .ripple-wrap { position:relative; overflow:hidden; }
+  .ripple { position:absolute; border-radius:50%; transform:scale(0); animation:rippleA .6s linear; background:rgba(255,255,255,.22); pointer-events:none; }
+  @keyframes rippleA { to{transform:scale(4);opacity:0} }
+  ::-webkit-scrollbar { width:4px; }
+  ::-webkit-scrollbar-thumb { background:#475569; border-radius:2px; }
 
-    /* ── Loading skeleton ── */
-    .skeleton {
-      background: linear-gradient(90deg, #273549 25%, #334155 50%, #273549 75%);
-      background-size: 200% 100%;
-      animation: skeleton 1.5s infinite;
-      border-radius: 8px;
-    }
-    @keyframes skeleton {
-      0% { background-position: 200% 0; }
-      100% { background-position: -200% 0; }
-    }
+  /* QR Loading spinner */
+  .qr-gen-spinner {
+    width:60px; height:60px; border:4px solid rgba(249,115,22,.2);
+    border-top-color:#f97316; border-radius:50%; animation:spin .8s linear infinite;
+  }
+  @keyframes spin { to{transform:rotate(360deg)} }
 
-    /* ── Leaflet popup custom ── */
-    .leaflet-popup-content-wrapper {
-      background: #1e293b !important;
-      color: #f1f5f9 !important;
-      border-radius: 16px !important;
-      box-shadow: 0 8px 30px rgba(0,0,0,0.5) !important;
-      border: 1px solid rgba(255,255,255,0.1) !important;
-    }
-    .leaflet-popup-tip-container { display: none; }
-    .leaflet-popup-close-button { color: #94a3b8 !important; top: 8px !important; right: 12px !important; font-size: 18px !important; }
-
-    /* ── Badge/chip ── */
-    .chip {
-      display: inline-flex; align-items: center; gap: 4px;
-      padding: 4px 10px;
-      border-radius: 20px;
-      font-size: 12px; font-weight: 600;
-    }
-  </style>
+  /* Leaflet popup */
+  .leaflet-popup-content-wrapper { background:#1e293b !important; color:#f1f5f9 !important; border-radius:16px !important; box-shadow:0 8px 30px rgba(0,0,0,.5) !important; border:1px solid rgba(255,255,255,.1) !important; }
+  .leaflet-popup-tip-container { display:none; }
+</style>
 </head>
-<body class="h-full overflow-hidden">
+<body>
 
-  <!-- ████████████████████  LOGIN SCREEN  ████████████████████ -->
-  <div id="login-screen">
-    <!-- Animated background orbs -->
-    <div class="absolute inset-0 overflow-hidden pointer-events-none">
-      <div class="absolute top-20 left-10 w-64 h-64 rounded-full opacity-20"
-           style="background: radial-gradient(circle, #f97316, transparent); animation: float 6s ease-in-out infinite;"></div>
-      <div class="absolute bottom-32 right-5 w-48 h-48 rounded-full opacity-15"
-           style="background: radial-gradient(circle, #22c55e, transparent); animation: float 8s ease-in-out infinite reverse;"></div>
-      <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full opacity-5"
-           style="background: radial-gradient(circle, #f97316, transparent);"></div>
-    </div>
-    <style>
-      @keyframes float {
-        0%, 100% { transform: translateY(0px) scale(1); }
-        50% { transform: translateY(-20px) scale(1.05); }
-      }
-    </style>
+<!-- ═══════════════════════════════════════════════════
+     LOGIN SCREEN — 4 sub-screens
+═══════════════════════════════════════════════════ -->
+<div id="login-screen">
+  <div class="orb orb-a"></div><div class="orb orb-b"></div><div class="orb orb-c"></div>
 
-    <!-- Logo -->
-    <div class="relative text-center mb-10">
-      <div class="w-24 h-24 mx-auto mb-5 flex items-center justify-center rounded-3xl shadow-2xl"
-           style="background: linear-gradient(135deg, #f97316, #fb923c); box-shadow: 0 20px 60px rgba(249,115,22,0.5);">
+  <!-- ── HOME ── -->
+  <div id="ls-home" class="ls-sub">
+    <div class="text-center mb-8">
+      <div class="w-24 h-24 mx-auto mb-5 rounded-3xl flex items-center justify-center shadow-2xl"
+           style="background:linear-gradient(135deg,#f97316,#fb923c);box-shadow:0 20px 60px rgba(249,115,22,.45);animation:orbFloat 4s ease-in-out infinite">
         <span class="text-5xl">🍜</span>
       </div>
       <h1 class="text-4xl font-black tracking-tight text-white">FOOD DROP</h1>
-      <p class="text-slate-400 mt-2 text-sm font-medium tracking-widest uppercase">Bản đồ quán ăn hội bạn thân</p>
+      <p class="text-slate-400 text-sm mt-2">Bản đồ quán ăn · Hội bạn thân</p>
+      <div class="flex flex-wrap gap-2 justify-center mt-4">
+        <span class="text-xs px-3 py-1 rounded-full font-semibold" style="background:rgba(34,197,94,.12);color:#22c55e;border:1px solid rgba(34,197,94,.25);">📍 Realtime</span>
+        <span class="text-xs px-3 py-1 rounded-full font-semibold" style="background:rgba(234,179,8,.12);color:#eab308;border:1px solid rgba(234,179,8,.25);">⭐ Review</span>
+        <span class="text-xs px-3 py-1 rounded-full font-semibold" style="background:rgba(249,115,22,.12);color:#f97316;border:1px solid rgba(249,115,22,.25);">👥 Bạn bè</span>
+      </div>
     </div>
-
-    <!-- Feature pills -->
-    <div class="flex flex-wrap gap-2 justify-center mb-10">
-      <span class="chip" style="background:rgba(34,197,94,0.15); color:#22c55e; border:1px solid rgba(34,197,94,0.3);">📍 Realtime Map</span>
-      <span class="chip" style="background:rgba(234,179,8,0.15); color:#eab308; border:1px solid rgba(234,179,8,0.3);">⭐ Đánh giá quán</span>
-      <span class="chip" style="background:rgba(249,115,22,0.15); color:#f97316; border:1px solid rgba(249,115,22,0.3);">🎰 Chốt quán ngay</span>
+    <div class="w-full flex flex-col gap-3">
+      <button id="btn-home-create" class="auth-card primary" aria-label="Tạo tài khoản">
+        <div class="auth-icon">✨</div>
+        <div class="flex-1">
+          <p class="font-black text-white text-base">Tạo tài khoản mới</p>
+          <p class="text-slate-400 text-xs mt-0.5">Tự động tạo mã QR cá nhân</p>
+        </div>
+        <span class="text-slate-500 text-xl">›</span>
+      </button>
+      <button id="btn-home-login" class="auth-card secondary" aria-label="Đăng nhập">
+        <div class="auth-icon">🔑</div>
+        <div class="flex-1">
+          <p class="font-black text-white text-base">Đăng nhập bằng QR</p>
+          <p class="text-slate-400 text-xs mt-0.5">Upload ảnh hoặc quét camera</p>
+        </div>
+        <span class="text-slate-500 text-xl">›</span>
+      </button>
+      <button id="btn-home-skip" class="auth-card secondary" style="background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);" aria-label="Bỏ qua đăng nhập">
+        <div class="auth-icon" style="background:rgba(59,130,246,.2);border:none;">🚀</div>
+        <div class="flex-1">
+          <p class="font-black text-blue-400 text-base">Trải nghiệm ngay</p>
+          <p class="text-blue-300/70 text-xs mt-0.5">Vào bản đồ không cần tài khoản</p>
+        </div>
+        <span class="text-blue-500/50 text-xl">›</span>
+      </button>
     </div>
-
-    <!-- Google Sign In Button -->
-    <button id="btn-google-login"
-      class="w-full max-w-xs flex items-center justify-center gap-3 py-4 px-6 rounded-2xl font-semibold text-base text-slate-800 shadow-2xl transition-all duration-200 active:scale-95"
-      style="background: linear-gradient(135deg, #fff, #f8fafc);">
-      <svg width="22" height="22" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-        <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/>
-        <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/>
-        <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/>
-        <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
-      </svg>
-      <span>Đăng nhập với Google</span>
-    </button>
-
-    <p class="text-slate-500 text-xs text-center mt-6 max-w-xs">
-      Bằng cách đăng nhập, bạn đồng ý chia sẻ vị trí GPS & đánh giá quán ăn với hội bạn của mình 🤝
-    </p>
+    <p class="text-slate-600 text-xs mt-6 text-center">Không cần mật khẩu · Không cần email 🎉</p>
   </div>
 
-  <!-- ████████████████████  MAIN APP  ████████████████████ -->
-  <div id="main-app" class="hidden">
+  <!-- ── QR SHOW (after create) ── -->
+  <div id="ls-qr-show" class="ls-sub hidden" style="max-height:calc(100dvh - 40px);overflow-y:auto;-webkit-overflow-scrolling:touch;">
+    <div class="self-start mb-5 pt-2">
+      <button id="btn-back-qr" class="btn-back">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M5 12l7-7M5 12l7 7"/></svg>
+        Quay lại
+      </button>
+    </div>
+    <div class="text-center mb-5 w-full">
+      <h2 class="text-2xl font-black text-white">Mã QR của bạn ✨</h2>
+      <p class="text-slate-400 text-sm mt-1">Lưu ảnh này để đăng nhập lại</p>
+    </div>
 
-    <!-- ── Map Container ── -->
-    <div id="map"></div>
-
-    <!-- ── Header Bar (top floating) ── -->
-    <div id="header-bar" class="px-4 pt-3">
-      <div class="flex items-center justify-between">
-        <!-- App Logo -->
-        <div class="flex items-center gap-2 bg-slate-900/80 backdrop-blur-xl rounded-2xl px-4 py-2.5 border border-slate-700/50 shadow-xl">
-          <span class="text-xl">🍜</span>
-          <span class="font-black text-white text-base tracking-tight">FOOD DROP</span>
+    <!-- QR card with gradient glow -->
+    <div class="qr-glow-wrap mb-4 w-full flex justify-center">
+      <div class="qr-glow-inner" id="qr-show-inner">
+        <!-- Spinner while generating -->
+        <div id="qr-gen-loading" class="flex flex-col items-center gap-4 py-4">
+          <div class="qr-gen-spinner"></div>
+          <p class="text-slate-400 text-sm">Đang tạo mã QR...</p>
         </div>
-
-        <!-- User Avatar & review count -->
-        <div class="flex items-center gap-2">
-          <div class="bg-slate-900/80 backdrop-blur-xl rounded-2xl px-3 py-2.5 border border-slate-700/50 shadow-xl">
-            <span id="review-count-badge" class="text-xs font-bold text-brand">0 quán</span>
-          </div>
-          <button id="btn-user-avatar" class="w-11 h-11 rounded-2xl overflow-hidden border-2 border-brand shadow-xl bg-slate-800">
-            <img id="user-avatar-img" src="" alt="Avatar" class="w-full h-full object-cover hidden" />
-            <div id="user-avatar-fallback" class="w-full h-full flex items-center justify-center text-brand font-bold text-lg">?</div>
-          </button>
-        </div>
+        <!-- Canvas (hidden until done) -->
+        <canvas id="qr-login-canvas" width="240" height="240" class="hidden"></canvas>
       </div>
     </div>
 
-    <!-- ── Control Bar (bottom floating) ── -->
-    <div id="control-bar">
-      <div class="bg-slate-900/85 backdrop-blur-xl rounded-3xl border border-slate-700/50 shadow-2xl p-3">
-        <div class="flex items-center justify-around gap-2">
-
-          <!-- Locate Me Button -->
-          <button id="btn-locate" class="fab bg-slate-700/80 border border-slate-600/50" title="Về vị trí của tôi" aria-label="Về vị trí của tôi">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="text-sky-400">
-              <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8" stroke-opacity=".3"/>
-            </svg>
-          </button>
-
-          <!-- Add Review FAB (Main CTA) -->
-          <button id="btn-add-review" class="fab fab-main ripple-container" title="Thêm đánh giá quán" aria-label="Thêm quán mới">
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
-              <path d="M12 5v14M5 12h14"/>
-            </svg>
-          </button>
-
-          <!-- Food Picker Button -->
-          <button id="btn-food-picker" class="fab bg-slate-700/80 border border-slate-600/50" title="Hôm nay ăn gì?" aria-label="Quay random quán ăn">
-            <span class="text-2xl">🎰</span>
-          </button>
-
-        </div>
-
-        <!-- GPS Status bar -->
-        <div class="flex items-center justify-center gap-2 mt-2">
-          <div id="gps-dot" class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></div>
-          <span id="gps-status-text" class="text-xs text-slate-400">Đang lấy GPS...</span>
-        </div>
+    <!-- Warning -->
+    <div class="w-full rounded-2xl p-3.5 mb-4 flex gap-3 items-start"
+         style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.25);">
+      <span class="text-xl flex-shrink-0 mt-0.5">⚠️</span>
+      <div>
+        <p class="text-yellow-300 font-bold text-sm">Lưu ảnh mã QR ngay!</p>
+        <p class="text-yellow-200/60 text-xs mt-0.5">Bạn cần ảnh này để đăng nhập lại trên thiết bị khác.</p>
       </div>
     </div>
 
-  </div><!-- /#main-app -->
+    <div class="w-full flex flex-col gap-3 pb-4">
+      <button id="btn-download-qr"
+        class="w-full py-3.5 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2 transition-all active:scale-95"
+        style="background:rgba(100,116,139,.18);border:1.5px solid rgba(100,116,139,.3);color:#cbd5e1;">
+        💾 Lưu ảnh mã QR
+      </button>
+      <button id="btn-enter-app"
+        class="w-full py-4 rounded-2xl font-black text-base text-white ripple-wrap transition-all active:scale-95 flex items-center justify-center gap-2"
+        style="background:linear-gradient(135deg,#f97316,#fb923c);box-shadow:0 8px 25px rgba(249,115,22,.45);">
+        🗺️ Vào bản đồ!
+      </button>
+    </div>
+  </div>
 
-  <!-- ████████████████████  MODAL: ADD REVIEW  ████████████████████ -->
-  <div id="modal-add-review" class="modal-overlay" role="dialog" aria-modal="true" aria-label="Thêm đánh giá quán ăn">
-    <div id="modal-card-add" class="modal-card" style="padding-bottom: env(safe-area-inset-bottom, 24px);">
-      <div class="bottom-sheet-handle"></div>
-      <div class="px-5 pt-4 pb-6">
+  <!-- ── LOGIN (upload primary + camera secondary) ── -->
+  <div id="ls-login" class="ls-sub hidden">
+    <div class="self-start mb-6">
+      <button id="btn-back-login" class="btn-back">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M5 12l7-7M5 12l7 7"/></svg>
+        Quay lại
+      </button>
+    </div>
+    <div class="text-center mb-7 w-full">
+      <div class="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center"
+           style="background:linear-gradient(135deg,#f97316,#fb923c);box-shadow:0 10px 30px rgba(249,115,22,.35);">
+        <span class="text-3xl">🔑</span>
+      </div>
+      <h2 class="text-2xl font-black text-white">Đăng nhập</h2>
+      <p class="text-slate-400 text-sm mt-1">Dùng ảnh mã QR đã lưu trong máy</p>
+    </div>
 
-        <!-- Header -->
-        <div class="flex items-center justify-between mb-5">
-          <div>
-            <h2 class="text-xl font-black text-white">Thêm Quán Ăn 🍽️</h2>
-            <p id="modal-coords-label" class="text-xs text-slate-400 mt-0.5">Chọn vị trí trên bản đồ...</p>
-          </div>
-          <button id="btn-close-add-modal" class="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-slate-400" aria-label="Đóng">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    <!-- PRIMARY: Upload -->
+    <button id="btn-upload-login-trigger" class="upload-zone w-full mb-5" aria-label="Upload ảnh QR">
+      <div class="upload-zone-icon">📁</div>
+      <p class="font-black text-white text-lg">Chọn ảnh QR từ thư viện</p>
+      <p class="text-slate-400 text-sm text-center">Mở ảnh mã QR đã lưu → tự động đăng nhập</p>
+      <div id="login-upload-status" class="hidden mt-2">
+        <div class="qr-gen-spinner" style="width:28px;height:28px;border-width:3px;"></div>
+      </div>
+    </button>
+
+    <div class="or-divider mb-5">HOẶC</div>
+
+    <!-- SECONDARY: Camera -->
+    <button id="btn-login-camera"
+      class="w-full py-3.5 rounded-2xl font-semibold text-sm flex items-center justify-center gap-3 transition-all active:scale-95"
+      style="background:rgba(100,116,139,.15);border:1.5px solid rgba(100,116,139,.3);color:#cbd5e1;">
+      <span class="text-xl">📷</span>
+      <span>Quét bằng camera</span>
+    </button>
+
+    <p class="text-slate-600 text-xs mt-5 text-center">Mã QR được tạo khi đăng ký tài khoản</p>
+  </div>
+
+  <!-- ── CAMERA SCAN (login) ── -->
+  <div id="ls-scan" class="ls-sub hidden">
+    <div class="self-start mb-5">
+      <button id="btn-back-scan" class="btn-back">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M5 12l7-7M5 12l7 7"/></svg>
+        Quay lại
+      </button>
+    </div>
+    <div class="text-center mb-5 w-full">
+      <h2 class="text-2xl font-black text-white">Quét mã QR 📷</h2>
+      <p class="text-slate-400 text-sm mt-1">Đặt mã QR vào khung</p>
+    </div>
+    <div class="scanner-box mb-4">
+      <video id="login-qr-video" playsinline muted autoplay></video>
+      <canvas id="login-qr-canvas-scan" class="hidden"></canvas>
+      <div class="scan-overlay">
+        <div class="scan-zone">
+          <div class="sc tl"></div><div class="sc tr"></div>
+          <div class="sc bl"></div><div class="sc br"></div>
+          <div class="scan-line"></div>
+        </div>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 mb-4">
+      <div id="ls-scan-dot" class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></div>
+      <p id="ls-scan-status" class="text-slate-300 text-sm">Đang khởi động camera...</p>
+    </div>
+    <div id="ls-scan-err" class="hidden w-full rounded-2xl p-4 text-center"
+         style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);">
+      <p class="text-red-400 font-bold text-sm mb-1">📵 Không mở được camera</p>
+      <p class="text-slate-400 text-xs">Kiểm tra quyền camera, hoặc dùng HTTPS/localhost.</p>
+    </div>
+  </div>
+
+</div><!-- /#login-screen -->
+
+
+<!-- ═══════════════════════════════════════════════════
+     MAIN APP
+═══════════════════════════════════════════════════ -->
+<div id="main-app" class="hidden">
+  <div id="map"></div>
+
+  <!-- Header -->
+  <div id="header-bar" class="px-4 pt-3">
+    <div class="flex items-center justify-between" style="pointer-events:all;">
+      <!-- Logo -->
+      <div class="flex items-center gap-2 bg-slate-900/82 backdrop-blur-xl rounded-2xl px-4 py-2.5 border border-slate-700/50 shadow-xl">
+        <span class="text-xl">🍜</span>
+        <span class="font-black text-white text-base tracking-tight">FOOD DROP</span>
+      </div>
+      <!-- Right actions -->
+      <div class="flex items-center gap-2">
+        <div class="bg-slate-900/82 backdrop-blur-xl rounded-2xl px-3 py-2.5 border border-slate-700/50 shadow-xl">
+          <span id="review-count-badge" class="text-xs font-bold text-orange-400">0 quán</span>
+        </div>
+        <!-- Friends button with badge -->
+        <div class="relative">
+          <button id="btn-friends-header"
+            class="w-11 h-11 rounded-2xl bg-slate-900/82 backdrop-blur-xl border border-slate-700/50 shadow-xl flex items-center justify-center"
+            aria-label="Bạn bè">
+            <span class="text-xl">👥</span>
           </button>
+          <div id="friend-req-badge"
+            class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full text-[10px] font-black text-white flex items-center justify-center px-1"
+            aria-label="Yêu cầu kết bạn">0</div>
         </div>
-
-        <!-- Place Name Input -->
-        <div class="mb-4">
-          <label class="text-sm font-semibold text-slate-300 mb-2 block">Tên quán *</label>
-          <input id="input-place-name" type="text" class="custom-input" placeholder="VD: Phở Bò Hàng Đồng, Bánh Mì Bảo..." maxlength="60" autocomplete="off" />
-        </div>
-
-        <!-- Star Rating -->
-        <div class="mb-4">
-          <label class="text-sm font-semibold text-slate-300 mb-3 block">Số sao đánh giá *</label>
-          <div class="flex justify-center gap-3" id="star-picker" role="group" aria-label="Chọn số sao">
-            <button class="star-btn" data-star="1" aria-label="1 sao">⭐</button>
-            <button class="star-btn" data-star="2" aria-label="2 sao">⭐</button>
-            <button class="star-btn" data-star="3" aria-label="3 sao">⭐</button>
-            <button class="star-btn" data-star="4" aria-label="4 sao">⭐</button>
-            <button class="star-btn" data-star="5" aria-label="5 sao">⭐</button>
-          </div>
-          <p id="star-label-text" class="text-center text-slate-500 text-sm mt-2">Chưa chọn sao</p>
-        </div>
-
-        <!-- Note Input -->
-        <div class="mb-6">
-          <label class="text-sm font-semibold text-slate-300 mb-2 block">Ghi chú / Món nên thử</label>
-          <textarea id="input-note" class="custom-input resize-none" rows="3"
-            placeholder="VD: Phải order bún bò đặc biệt, ngồi tầng 2 view đẹp lắm..."></textarea>
-        </div>
-
-        <!-- Submit Button -->
-        <button id="btn-submit-review"
-          class="w-full py-4 rounded-2xl font-bold text-base text-white transition-all duration-200 active:scale-95 flex items-center justify-center gap-2"
-          style="background: linear-gradient(135deg, #f97316, #fb923c); box-shadow: 0 8px 25px rgba(249,115,22,0.4);">
-          <span id="btn-submit-text">Ghim quán lên bản đồ 📍</span>
-          <div id="btn-submit-spinner" class="hidden w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+        <!-- My avatar -->
+        <button id="btn-my-profile"
+          class="w-11 h-11 rounded-2xl border-2 border-orange-400 shadow-xl flex items-center justify-center font-black text-base text-white"
+          style="background:linear-gradient(135deg,#f97316,#fb923c);"
+          aria-label="Hồ sơ của tôi">
+          <span id="user-initial">?</span>
         </button>
-
       </div>
     </div>
   </div>
 
-  <!-- ████████████████████  BOTTOM SHEET: REVIEW DETAIL  ████████████████████ -->
-  <div id="overlay-review-detail" class="bottom-sheet-overlay" aria-hidden="true">
-    <div id="sheet-review-detail" class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Chi tiết đánh giá quán">
-      <div class="bottom-sheet-handle"></div>
-      <div class="px-5 pt-4 pb-6" id="review-detail-content">
-        <!-- Dynamic content injected by JS -->
-      </div>
-    </div>
-  </div>
-
-  <!-- ████████████████████  SPIN WHEEL OVERLAY  ████████████████████ -->
-  <div id="spin-overlay" aria-label="Quay chọn quán ăn" role="dialog">
-    <!-- Close button -->
-    <button id="btn-close-spin"
-      class="absolute top-4 right-4 w-10 h-10 rounded-full bg-slate-700/80 flex items-center justify-center text-slate-400 z-10">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
-    </button>
-
-    <div class="text-center mb-8">
-      <p class="text-slate-400 text-sm font-medium tracking-widest uppercase mb-1">Hôm Nay Ăn Gì?</p>
-      <h2 class="text-3xl font-black text-white">🎰 Vòng Quay Chốt Quán</h2>
-    </div>
-
-    <!-- Wheel -->
-    <div class="relative mb-8">
-      <div class="spin-pointer">▼</div>
-      <div id="spin-wheel" class="spin-wheel">
-        <div class="spin-wheel-inner" id="spin-icon">🍜</div>
-      </div>
-    </div>
-
-    <!-- Status text -->
-    <div id="spin-status" class="text-center mb-8 min-h-[70px] flex flex-col items-center justify-center">
-      <p id="spin-loading-text" class="text-slate-400">Đang tìm quán 4-5⭐ gần bạn...</p>
-      <div id="spin-candidates-count" class="hidden mt-2">
-        <span id="spin-count-num" class="text-4xl font-black text-brand"></span>
-        <span class="text-slate-400 ml-1">quán phù hợp</span>
-      </div>
-    </div>
-
-    <!-- Winner card -->
-    <div id="spin-winner" class="hidden w-full max-w-xs mx-auto">
-      <div class="rounded-3xl p-5 border border-slate-600/50 text-center"
-           style="background: linear-gradient(135deg, rgba(249,115,22,0.15), rgba(251,146,60,0.1));">
-        <div class="text-4xl mb-3" id="spin-winner-emoji">🎉</div>
-        <p class="text-slate-400 text-xs font-semibold tracking-widest uppercase mb-1">Hôm nay hội đi</p>
-        <h3 id="spin-winner-name" class="text-2xl font-black text-white mb-2"></h3>
-        <div id="spin-winner-stars" class="rating-stars text-2xl mb-3"></div>
-        <p id="spin-winner-note" class="text-slate-400 text-sm"></p>
-        <button id="btn-go-to-winner"
-          class="mt-4 w-full py-3 rounded-xl font-bold text-sm text-white"
-          style="background: linear-gradient(135deg, #f97316, #fb923c);">
-          📍 Xem trên bản đồ
+  <!-- Control Bar -->
+  <div id="control-bar">
+    <div class="bg-slate-900/85 backdrop-blur-xl rounded-3xl border border-slate-700/50 shadow-2xl p-3">
+      <div class="flex items-center justify-around gap-2">
+        <button id="btn-locate" class="fab w-[52px] h-[52px] bg-slate-700/80 border border-slate-600/50" aria-label="GPS">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.5">
+            <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+          </svg>
+        </button>
+        <button id="btn-add-review" class="fab w-16 h-16 ripple-wrap" aria-label="Thêm quán"
+          style="background:linear-gradient(135deg,#f97316,#fb923c);box-shadow:0 6px 25px rgba(249,115,22,.5);">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+        <button id="btn-food-picker" class="fab w-[52px] h-[52px] bg-slate-700/80 border border-slate-600/50" aria-label="Hôm nay ăn gì">
+          <span class="text-2xl">🎰</span>
         </button>
       </div>
+      <div class="flex items-center justify-center gap-2 mt-2">
+        <div id="gps-dot" class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></div>
+        <span id="gps-status" class="text-xs text-slate-400">Đang lấy GPS...</span>
+      </div>
     </div>
+  </div>
+</div><!-- /#main-app -->
 
-    <!-- Spin button -->
-    <button id="btn-spin-go" class="hidden mt-6 py-4 px-8 rounded-2xl font-bold text-base text-white"
-      style="background: linear-gradient(135deg, #f97316, #fb923c); box-shadow: 0 8px 25px rgba(249,115,22,0.4);">
-      🎲 Quay thôi!
+
+<!-- ═══════════════════════════════════════════════════
+     MY PROFILE BOTTOM SHEET
+═══════════════════════════════════════════════════ -->
+<div id="ov-my-profile" class="bs-overlay" aria-hidden="true">
+  <div id="sh-my-profile" class="bs-panel" role="dialog" aria-label="Hồ sơ của tôi">
+    <div class="bs-handle"></div>
+    <div class="px-5 pt-4 pb-6">
+      <div class="flex items-center justify-between mb-5">
+        <h3 class="text-xl font-black text-white">Hồ sơ của tôi 👤</h3>
+        <button id="btn-close-my-profile" class="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-slate-400">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- My QR -->
+      <div class="text-center mb-1">
+        <p class="text-xs text-slate-400 font-semibold uppercase tracking-widest mb-3">Mã QR kết bạn của bạn</p>
+        <div class="qr-glow-wrap inline-block">
+          <div class="qr-glow-inner">
+            <canvas id="my-profile-qr-canvas" width="200" height="200"></canvas>
+          </div>
+        </div>
+      </div>
+      <p class="text-center text-slate-500 text-xs mt-2 mb-4">Cho bạn bè quét để kết bạn với bạn</p>
+
+      <!-- Stats + actions -->
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        <div class="rounded-2xl p-3 text-center" style="background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.2);">
+          <p class="text-2xl font-black text-orange-400" id="stat-friends-count">0</p>
+          <p class="text-slate-400 text-xs mt-0.5">Bạn bè</p>
+        </div>
+        <div class="rounded-2xl p-3 text-center" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);">
+          <p class="text-2xl font-black text-red-400" id="stat-req-count">0</p>
+          <p class="text-slate-400 text-xs mt-0.5">Yêu cầu chờ</p>
+        </div>
+      </div>
+
+      <div class="flex gap-3 mb-5">
+        <button id="btn-download-my-qr"
+          class="flex-1 py-3 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2 transition-all active:scale-95"
+          style="background:rgba(100,116,139,.18);border:1.5px solid rgba(100,116,139,.3);color:#cbd5e1;">
+          💾 Lưu QR
+        </button>
+        <button id="btn-open-add-friend"
+          class="flex-1 py-3 rounded-2xl font-bold text-sm text-white flex items-center justify-center gap-2 transition-all active:scale-95"
+          style="background:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 4px 15px rgba(99,102,241,.35);">
+          ➕ Thêm bạn
+        </button>
+      </div>
+
+      <!-- Friend Requests -->
+      <div id="friend-reqs-section" class="hidden mb-4">
+        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">⏳ Yêu cầu kết bạn</p>
+        <div id="friend-req-list"></div>
+      </div>
+
+      <!-- Friends list -->
+      <div id="friends-section" class="hidden mb-5">
+        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">🤝 Bạn bè</p>
+        <div id="friends-list"></div>
+      </div>
+
+      <!-- Logout -->
+      <button id="btn-logout"
+        class="w-full py-3.5 rounded-2xl font-semibold text-sm text-red-400 flex items-center justify-center gap-2 transition-all active:scale-95"
+        style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);">
+        🚪 Đăng xuất
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════
+     ADD FRIEND — FULLSCREEN MODAL (camera primary)
+═══════════════════════════════════════════════════ -->
+<div id="modal-add-friend" class="fs-modal" role="dialog" aria-label="Thêm bạn bè">
+  <div class="w-full flex items-center justify-between mb-5 mt-2">
+    <button id="btn-close-add-friend" class="btn-back">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M5 12l7-7M5 12l7 7"/></svg>
+      Đóng
     </button>
+    <h3 class="text-lg font-black text-white">Thêm bạn bè</h3>
+    <div class="w-16"></div>
+  </div>
 
-    <!-- No restaurants message -->
-    <div id="spin-empty" class="hidden text-center">
-      <div class="text-5xl mb-4">😅</div>
-      <p class="text-white font-bold text-lg mb-2">Chưa có quán 4-5⭐ gần đây!</p>
-      <p class="text-slate-400 text-sm">Hãy thêm quán ăn ngon vào bản đồ trước nhé.</p>
+  <p class="text-slate-400 text-sm mb-5 text-center">Quét mã QR của bạn bè<br>hoặc bảo họ cho xem mã trên màn hình</p>
+
+  <!-- Camera (primary) -->
+  <div class="scanner-box mb-4" style="max-width:280px;">
+    <video id="friend-qr-video" playsinline muted autoplay></video>
+    <canvas id="friend-qr-canvas-scan" class="hidden"></canvas>
+    <div class="scan-overlay">
+      <div class="scan-zone">
+        <div class="sc tl"></div><div class="sc tr"></div>
+        <div class="sc bl"></div><div class="sc br"></div>
+        <div class="scan-line"></div>
+      </div>
     </div>
   </div>
 
-  <!-- ████████████████████  TOAST CONTAINER  ████████████████████ -->
-  <div id="toast-container" role="status" aria-live="polite"></div>
+  <div class="flex items-center gap-2 mb-4">
+    <div id="af-scan-dot" class="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></div>
+    <p id="af-scan-status" class="text-slate-300 text-sm">Đang mở camera...</p>
+  </div>
 
-  <!-- ████████████████████  SCRIPTS  ████████████████████ -->
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WLs=" crossorigin=""></script>
+  <div class="or-divider mb-4 w-full max-w-xs">HOẶC</div>
 
-  <!-- Firebase SDK v10 (Modular - compat mode for CDN) -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <!-- Upload (secondary) -->
+  <button id="btn-upload-friend-trigger" class="w-full max-w-xs py-3.5 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2 transition-all active:scale-95 mb-4"
+    style="background:rgba(99,102,241,.15);border:1.5px solid rgba(99,102,241,.35);color:#a5b4fc;">
+    <span>📁</span> Upload ảnh QR bạn bè
+  </button>
+</div>
 
-  <!-- Main App Logic -->
-  <script src="./app.js"></script>
 
+<!-- ═══════════════════════════════════════════════════
+     USER PROFILE SHEET (khi tap avatar marker trên map)
+═══════════════════════════════════════════════════ -->
+<div id="ov-user-profile" class="bs-overlay" aria-hidden="true">
+  <div id="sh-user-profile" class="bs-panel" role="dialog" aria-label="Hồ sơ người dùng">
+    <div class="bs-handle"></div>
+    <div class="px-5 pt-4 pb-6" id="user-profile-content">
+      <!-- Injected dynamically -->
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════
+     ADD REVIEW MODAL
+═══════════════════════════════════════════════════ -->
+<div id="modal-add-review" class="modal-ov" role="dialog" aria-modal="true">
+  <div id="modal-add-review-panel" class="modal-panel">
+    <div class="bs-handle"></div>
+    <div class="px-5 pt-4 pb-6">
+      <div class="flex items-center justify-between mb-5">
+        <div>
+          <h2 class="text-xl font-black text-white">Thêm Quán Ăn 🍽️</h2>
+          <p id="modal-coords" class="text-xs text-slate-400 mt-0.5">📍 Chọn vị trí...</p>
+        </div>
+        <button id="btn-close-add-review" class="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-slate-400" aria-label="Đóng">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="mb-4">
+        <label class="text-sm font-semibold text-slate-300 mb-2 block">Tên quán *</label>
+        <input id="inp-place-name" type="text" class="c-input" placeholder="VD: Phở Bò Hàng Đồng..." maxlength="60" autocomplete="off" />
+      </div>
+      <div class="mb-4">
+        <label class="text-sm font-semibold text-slate-300 mb-2 block">Món bán / Thể loại (Bánh tráng, Trà sữa...)</label>
+        <input id="inp-food-type" type="text" class="c-input" placeholder="VD: Bánh tráng nướng..." maxlength="40" autocomplete="off" />
+      </div>
+      <div class="mb-4">
+        <label class="text-sm font-semibold text-slate-300 mb-2 block">Địa chỉ quán</label>
+        <input id="inp-address" type="text" class="c-input" placeholder="VD: 123 Nguyễn Văn Linh..." maxlength="100" autocomplete="off" />
+      </div>
+      <div class="mb-4">
+        <label class="text-sm font-semibold text-slate-300 mb-3 block">Số sao *</label>
+        <div class="flex justify-center gap-3" id="star-picker">
+          <button class="star-btn" data-star="1">⭐</button>
+          <button class="star-btn" data-star="2">⭐</button>
+          <button class="star-btn" data-star="3">⭐</button>
+          <button class="star-btn" data-star="4">⭐</button>
+          <button class="star-btn" data-star="5">⭐</button>
+        </div>
+        <p id="star-label" class="text-center text-slate-500 text-sm mt-2">Chưa chọn sao</p>
+      </div>
+      <div class="mb-6">
+        <label class="text-sm font-semibold text-slate-300 mb-2 block">Ghi chú / Món nên thử</label>
+        <textarea id="inp-note" class="c-input resize-none" rows="3" placeholder="VD: Phải order bún bò đặc biệt..."></textarea>
+      </div>
+      <button id="btn-submit-review"
+        class="w-full py-4 rounded-2xl font-bold text-base text-white transition-all active:scale-95 flex items-center justify-center gap-2"
+        style="background:linear-gradient(135deg,#f97316,#fb923c);box-shadow:0 8px 25px rgba(249,115,22,.4);">
+        <span id="submit-rev-text">Ghim lên bản đồ 📍</span>
+        <div id="submit-rev-spin" class="hidden w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════
+     REVIEW DETAIL BOTTOM SHEET
+═══════════════════════════════════════════════════ -->
+<div id="ov-review-detail" class="bs-overlay" aria-hidden="true">
+  <div id="sh-review-detail" class="bs-panel" role="dialog">
+    <div class="bs-handle"></div>
+    <div class="px-5 pt-4 pb-6" id="review-detail-content"></div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════
+     SPIN WHEEL OVERLAY
+═══════════════════════════════════════════════════ -->
+<div id="spin-overlay" role="dialog">
+  <button id="btn-close-spin" class="absolute top-4 right-4 w-10 h-10 rounded-full bg-slate-700/80 flex items-center justify-center text-slate-400 z-10">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+  </button>
+  <div class="text-center mb-8">
+    <p class="text-slate-400 text-sm font-semibold tracking-widest uppercase mb-1">Hôm Nay Ăn Gì?</p>
+    <h2 class="text-3xl font-black text-white">🎰 Vòng Quay Chốt Quán</h2>
+  </div>
+  <div class="relative mb-8">
+    <div class="spin-ptr">▼</div>
+    <div id="spin-wheel" class="spin-wheel"><div class="spin-center" id="spin-icon">🍜</div></div>
+  </div>
+  <div id="spin-status" class="text-center mb-6 min-h-[64px] flex flex-col items-center justify-center">
+    <p id="spin-loading-txt" class="text-slate-400">Đang tìm quán 4-5⭐ gần bạn...</p>
+    <div id="spin-count-wrap" class="hidden mt-2">
+      <span id="spin-count" class="text-4xl font-black text-orange-400"></span>
+      <span class="text-slate-400 ml-1">quán phù hợp</span>
+    </div>
+  </div>
+  <div id="spin-winner" class="hidden w-full max-w-xs mx-auto">
+    <div class="rounded-3xl p-5 border border-slate-600/50 text-center" style="background:linear-gradient(135deg,rgba(249,115,22,.15),rgba(251,146,60,.1));">
+      <div class="text-4xl mb-3" id="spin-winner-emoji">🎉</div>
+      <p class="text-slate-400 text-xs font-semibold uppercase tracking-widest mb-1">Hôm nay hội đi</p>
+      <h3 id="spin-winner-name" class="text-2xl font-black text-white mb-2"></h3>
+      <div id="spin-winner-stars" class="text-2xl mb-3" style="color:#eab308;"></div>
+      <p id="spin-winner-note" class="text-slate-400 text-sm"></p>
+      <button id="btn-goto-winner" class="mt-4 w-full py-3 rounded-xl font-bold text-sm text-white"
+        style="background:linear-gradient(135deg,#f97316,#fb923c);">📍 Xem trên bản đồ</button>
+    </div>
+  </div>
+  <button id="btn-spin-go" class="hidden mt-5 py-4 px-8 rounded-2xl font-bold text-base text-white"
+    style="background:linear-gradient(135deg,#f97316,#fb923c);box-shadow:0 8px 25px rgba(249,115,22,.4);">🎲 Quay thôi!</button>
+  <div id="spin-empty" class="hidden text-center">
+    <div class="text-5xl mb-4">😅</div>
+    <p class="text-white font-bold text-lg mb-2">Chưa có quán 4-5⭐ gần đây!</p>
+    <p class="text-slate-400 text-sm">Thêm quán ăn ngon vào bản đồ trước nhé.</p>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════
+     TOAST + HIDDEN INPUTS
+═══════════════════════════════════════════════════ -->
+<div id="toast-wrap" role="status" aria-live="polite"></div>
+
+<!-- Hidden file inputs -->
+<input type="file" id="qr-upload-login"  accept="image/*" class="hidden">
+<input type="file" id="qr-upload-friend" accept="image/*" class="hidden">
+
+
+<!-- ═══════════════════════════════════════════════════
+     SCRIPTS
+═══════════════════════════════════════════════════ -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="./app.js?v=4.2"></script>
 </body>
 </html>
