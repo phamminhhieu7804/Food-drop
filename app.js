@@ -91,42 +91,12 @@ const S = {
 const $id = id => document.getElementById(id);
 
 const D = {
-  // Login
-  loginScreen:       $id('login-screen'),
-  lsHome:            $id('ls-home'),
-  lsQrShow:          $id('ls-qr-show'),
-  lsLogin:           $id('ls-login'),
-  lsScan:            $id('ls-scan'),
-
-  btnHomeCreate:     $id('btn-home-create'),
-  btnHomeLogin:      $id('btn-home-login'),
-  btnHomeSkip:       $id('btn-home-skip'),
-
-  qrGenLoading:      $id('qr-gen-loading'),
-  qrLoginCanvas:     $id('qr-login-canvas'),
-  btnBackQr:         $id('btn-back-qr'),
-  btnDownloadQr:     $id('btn-download-qr'),
-  btnEnterApp:       $id('btn-enter-app'),
-
-  btnBackLogin:      $id('btn-back-login'),
-  btnUploadLoginTrigger: $id('btn-upload-login-trigger'),
-  loginUploadStatus: $id('login-upload-status'),
-  btnLoginCamera:    $id('btn-login-camera'),
-  qrUploadLogin:     $id('qr-upload-login'),
-
-  btnBackScan:       $id('btn-back-scan'),
-  loginQrVideo:      $id('login-qr-video'),
-  loginQrCanvasScan: $id('login-qr-canvas-scan'),
-  lsScanDot:         $id('ls-scan-dot'),
-  lsScanStatus:      $id('ls-scan-status'),
-  lsScanErr:         $id('ls-scan-err'),
-
   // Main app
   mainApp:           $id('main-app'),
   reviewCountBadge:  $id('review-count-badge'),
   userInitial:       $id('user-initial'),
   btnMyProfile:      $id('btn-my-profile'),
-  btnFriendsHeader:  $id('btn-friends-header'),
+  btnInfoHeader:     $id('btn-info-header'),
   friendReqBadge:    $id('friend-req-badge'),
   btnLocate:         $id('btn-locate'),
   btnAddReview:      $id('btn-add-review'),
@@ -147,8 +117,6 @@ const D = {
   friendReqList:     $id('friend-req-list'),
   friendsSection:    $id('friends-section'),
   friendsList:       $id('friends-list'),
-  btnLogout:         $id('btn-logout'),
-
   // Add Friend modal
   modalAddFriend:    $id('modal-add-friend'),
   btnCloseAddFriend: $id('btn-close-add-friend'),
@@ -169,7 +137,9 @@ const D = {
   modalAddRevPanel:  $id('modal-add-review-panel'),
   modalCoords:       $id('modal-coords'),
   btnCloseAddReview: $id('btn-close-add-review'),
+  inpReviewerName:   $id('inp-reviewer-name'),
   inpPlaceName:      $id('inp-place-name'),
+  placeSuggestions:  $id('place-suggestions'),
   inpFoodType:       $id('inp-food-type'),
   inpAddress:        $id('inp-address'),
   starPicker:        $id('star-picker'),
@@ -183,6 +153,30 @@ const D = {
   ovReviewDetail:    $id('ov-review-detail'),
   shReviewDetail:    $id('sh-review-detail'),
   reviewDetailContent: $id('review-detail-content'),
+
+  // Sub-review modal
+  ovAddSubReview:    $id('ov-add-sub-review'),
+  shAddSubReview:    $id('sh-add-sub-review'),
+  btnCloseSubReview: $id('btn-close-sub-review'),
+  chkAnonSubReview:  $id('chk-anon-sub-review'),
+  inpSubReviewerName:$id('inp-sub-reviewer-name'),
+  inpSubReviewNote:  $id('inp-sub-review-note'),
+  
+  // Edit review modal
+  ovEditReview:      $id('ov-edit-review'),
+  shEditReview:      $id('sh-edit-review'),
+  btnCloseEditReview:$id('btn-close-edit-review'),
+  inpEditReviewNote: $id('inp-edit-review-note'),
+  starPickerEdit:    $id('star-picker-edit'),
+  starLabelEdit:     $id('star-label-edit'),
+  btnSubmitEditReview:$id('btn-submit-edit-review'),
+  editCountLabel:    $id('edit-count-label'),
+  btnSubmitSubReview:$id('btn-submit-sub-review'),
+
+  // Info modal
+  ovInfoModal:       $id('ov-info-modal'),
+  shInfoModal:       $id('sh-info-modal'),
+  btnCloseInfoModal: $id('btn-close-info-modal'),
 
   // Spin
   spinOverlay:       $id('spin-overlay'),
@@ -239,94 +233,16 @@ async function registerSW() {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// §7 · AUTH — Auto-generate account + localStorage session
+// §7 · ANONYMOUS USER — Không cần đăng nhập
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-function genUID() {
-  return (typeof window !== 'undefined' && window.crypto?.randomUUID?.()) ??
-    'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-      const r = Math.random() * 16 | 0;
-      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-    });
-}
-
-function genDisplayName() {
-  const p = NAME_P[Math.floor(Math.random() * NAME_P.length)];
-  const s = NAME_S[Math.floor(Math.random() * NAME_S.length)];
-  const n = Math.floor(Math.random() * 9000) + 1000;
-  return `${p}${s}#${n}`;
-}
-
-function tryAutoLogin() {
-  const raw = localStorage.getItem(LS_USER_KEY);
-  if (!raw) return false;
-  try {
-    const u = JSON.parse(raw);
-    if (!u?.uid || !u?.name) throw new Error('bad');
-    S.user = u;
-    loadLocalFriends();
-    return true;
-  } catch { localStorage.removeItem(LS_USER_KEY); return false; }
-}
-
-/** Tạo tài khoản — không cần input, tự gen tên + UID */
-async function createAccount() {
-  const uid  = genUID();
-  const name = genDisplayName();
-  const user = { uid, name, createdAt: Date.now() };
-
-  localStorage.setItem(LS_USER_KEY, JSON.stringify(user));
-  S.user = user;
-
-  // Persist to Firestore (non-blocking)
-  if (db) {
-    db.collection('users').doc(uid).set({
-      uid, name, createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-    }).catch(() => {});
-  }
-
-  // Switch to QR show screen, generate QR
-  showLoginSub('qr-show');
-  await genAndShowLoginQR(user);
-}
-
-function loginFromQRData(raw) {
-  try {
-    const d = JSON.parse(raw);
-    if (d?.app !== QR_APP_ID || !d?.uid || !d?.name) throw new Error('bad');
-    const user = { uid: d.uid, name: d.name, createdAt: d.ts || Date.now() };
-    localStorage.setItem(LS_USER_KEY, JSON.stringify(user));
-    S.user = user;
-    loadLocalFriends();
-    toast(`👋 Chào mừng, ${d.name}!`, 'ok', 2500);
-    showMainApp();
-  } catch {
-    toast('❌ Mã QR không đúng định dạng FOOD DROP!', 'err');
-    return false;
-  }
-  return true;
-}
-
-function logout() {
-  localStorage.removeItem(LS_USER_KEY);
-  S.user = null; S.friends = []; S.friendReqs = [];
-  S.unsubReviews?.(); S.unsubUsers?.(); S.unsubFriendReqs?.();
-  if (S.watchId) navigator.geolocation.clearWatch(S.watchId);
-  Object.values(S.userMarkers).forEach(m => S.map?.removeLayer(m));
-  S.userMarkers = {}; S.reviews = []; S.revMarkers = {};
-  S.didInitialFly = false; S.map = null;
-  closeMyProfile();
-  toast('👋 Đã đăng xuất!', 'info');
-  showLoginScreen();
-}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // §8 · GRADIENT QR GENERATION
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/** Build QR JSON payload */
+/** Build QR URL payload */
 function qrPayload(user) {
-  return JSON.stringify({ app: QR_APP_ID, uid: user.uid, name: user.name, ts: user.createdAt });
+  return `${window.location.origin}/?add_friend=${user.uid}`;
 }
 
 /**
@@ -468,154 +384,116 @@ async function downloadQRCard(srcCanvas, userName, suffix = '') {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 async function parseQRFromFile(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = e => {
-      const img = new Image();
-      img.onload = () => {
-        const MAX = 1200;
-        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
-        const c = document.createElement('canvas');
-        c.width = img.width * scale; c.height = img.height * scale;
-        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-        const imgd = c.getContext('2d').getImageData(0, 0, c.width, c.height);
-        const code = jsQR(imgd.data, imgd.width, imgd.height, { inversionAttempts: 'attemptBoth' });
-        if (code?.data) resolve(code.data);
-        else reject(new Error('No QR'));
-      };
-      img.onerror = () => reject(new Error('Bad image'));
-      img.src = e.target.result;
-    };
-    reader.onerror = () => reject(new Error('Read error'));
-    reader.readAsDataURL(file);
-  });
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// §10 · CAMERA QR SCANNER
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-async function startScanner(video, scanCanvas, onFound, onError, dotEl, statusEl, errEl) {
-  const ctx = scanCanvas.getContext('2d', { willReadFrequently: true });
-  setStatus(dotEl, statusEl, '🔍 Đang khởi động camera...', 'searching');
-  errEl?.classList.add('hidden');
-
+  if (typeof Html5Qrcode === 'undefined') {
+    throw new Error('Thư viện QR chưa được tải');
+  }
+  const html5QrCode = new Html5Qrcode("friend-qr-reader"); // Use any existing div or create a hidden one
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
-      audio: false,
-    });
-    video.srcObject = stream;
-    await video.play().catch(() => {});
-    setStatus(dotEl, statusEl, '📷 Đặt mã QR vào khung', 'ok');
-
-    const tick = () => {
-      if (video.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) {
-        scanCanvas.width = video.videoWidth; scanCanvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0, scanCanvas.width, scanCanvas.height);
-        const id = ctx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
-        const code = jsQR(id.data, id.width, id.height, { inversionAttempts: 'dontInvert' });
-        if (code?.data) { setStatus(dotEl, statusEl, '✅ Đọc được mã QR!', 'ok'); onFound(code.data, stream); return; }
-      }
-      return requestAnimationFrame(tick);
-    };
-    const raf = requestAnimationFrame(tick);
-    return { stream, raf };
+    const decodedText = await html5QrCode.scanFile(file, true);
+    return decodedText;
   } catch (err) {
-    const isPerm = err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError';
-    const msg = isPerm ? '🔒 Bị từ chối quyền camera' : '📵 Không thể mở camera';
-    setStatus(dotEl, statusEl, msg, 'err');
-    errEl?.classList.remove('hidden');
-    onError?.(err);
-    return null;
+    throw new Error('No QR');
   }
 }
 
-function stopScanner(ref) {
-  if (!ref) return;
-  if (ref.raf) cancelAnimationFrame(ref.raf);
-  if (ref.stream) ref.stream.getTracks().forEach(t => t.stop());
-}
 
-function setStatus(dot, label, text, type) {
-  if (label) label.textContent = text;
-  if (dot) {
-    const c = { ok:'#22c55e', searching:'#f97316', err:'#ef4444' };
-    dot.style.background = c[type] || '#f97316';
-    dot.classList.toggle('animate-pulse', type === 'searching');
-  }
-}
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// §10 · CAMERA QR SCANNER (Html5Qrcode)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-// Login camera scanner
-let _loginScanner = null;
-async function startLoginScanner() {
-  _loginScanner = await startScanner(
-    D.loginQrVideo, D.loginQrCanvasScan,
-    (data, stream) => {
-      stream.getTracks().forEach(t => t.stop());
-      loginFromQRData(data);
-    },
-    null, D.lsScanDot, D.lsScanStatus, D.lsScanErr
-  );
-}
-function stopLoginScanner() { stopScanner(_loginScanner); _loginScanner = null; }
+let _html5QrCode = null;
 
-// Friend camera scanner
-let _friendScanner = null;
 async function startFriendScanner() {
-  _friendScanner = await startScanner(
-    D.friendQrVideo, D.friendQrCanvasScan,
-    (data, stream) => {
-      stream.getTracks().forEach(t => t.stop());
-      _friendScanner = null;
-      handleFriendQR(data);
-    },
-    null, D.afScanDot, D.afScanStatus, null
-  );
+  if (typeof Html5Qrcode === 'undefined') {
+    toast('Thư viện QR chưa được tải!', 'err');
+    return;
+  }
+  
+  if (_html5QrCode) { stopFriendScanner(); }
+  
+  _html5QrCode = new Html5Qrcode("friend-qr-reader");
+  const config = { fps: 10, qrbox: { width: 220, height: 220 } };
+  
+  try {
+    const $status = $id('af-scan-status');
+    if ($status) $status.textContent = '📷 Đặt mã QR vào khung...';
+    
+    await _html5QrCode.start(
+      { facingMode: "environment" },
+      config,
+      (decodedText, decodedResult) => {
+        // Success
+        stopFriendScanner();
+        handleFriendQR(decodedText);
+      },
+      (errorMessage) => {
+        // parse error, ignore
+      }
+    );
+  } catch (err) {
+    console.error(err);
+    toast('📵 Không thể mở camera. Kiểm tra quyền truy cập!', 'err');
+    const $status = $id('af-scan-status');
+    if ($status) $status.textContent = '📵 Lỗi mở camera';
+  }
 }
-function stopFriendScanner() { stopScanner(_friendScanner); _friendScanner = null; }
+
+function stopFriendScanner() {
+  if (_html5QrCode && _html5QrCode.isScanning) {
+    _html5QrCode.stop().then(() => {
+      _html5QrCode.clear();
+      _html5QrCode = null;
+    }).catch(console.error);
+  }
+}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // §11 · SCREEN MANAGEMENT
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-const LOGIN_SUBS = { home: D.lsHome, 'qr-show': D.lsQrShow, login: D.lsLogin, scan: D.lsScan };
-
-function showLoginSub(id) {
-  Object.values(LOGIN_SUBS).forEach(el => el?.classList.add('hidden'));
-  const el = LOGIN_SUBS[id];
-  if (el) { el.classList.remove('hidden'); el.style.animation='none'; void el.offsetWidth; el.style.animation='lsFadeIn .3s ease-out'; }
-  if (id !== 'scan') stopLoginScanner();
-  if (id === 'scan') startLoginScanner();
-}
-
-function showLoginScreen() {
-  D.mainApp.style.display = 'none';
-  D.loginScreen.style.display = 'flex';
-  showLoginSub('home');
-}
 
 function showMainApp() {
-  stopLoginScanner();
-  D.loginScreen.style.display = 'none';
-  D.mainApp.style.display = 'flex';
+  // #main-app is always visible via CSS; no display toggling needed
 
   const initial = (S.user?.name || '?').charAt(0).toUpperCase();
-  D.userInitial.textContent = initial;
+  if (D.userInitial) D.userInitial.textContent = initial;
+
+  // Update profile sheet user info
+  const nameEl = document.getElementById('user-name-sheet');
+  const userEl = document.getElementById('user-username-sheet');
+  const initEl = document.getElementById('user-initial-sheet');
+  if (nameEl) nameEl.textContent = S.user?.name || 'Ẩn danh';
+  if (userEl) userEl.textContent = S.user?.username || '@user';
+  if (initEl) initEl.textContent = initial;
 
   if (!S.map) {
     initMap();
+    setInterval(() => {
+      document.querySelectorAll('.rev-name-label').forEach(el => {
+        const namesAttr = el.getAttribute('data-names');
+        if (!namesAttr) return;
+        const names = namesAttr.split('|');
+        if (names.length > 1) {
+          el.style.opacity = '0';
+          setTimeout(() => {
+            let idx = (parseInt(el.getAttribute('data-idx') || '0') + 1) % names.length;
+            el.setAttribute('data-idx', idx);
+            el.textContent = '@' + names[idx];
+            el.style.opacity = '0.9';
+          }, 300);
+        }
+      });
+    }, 5000);
     startGPS();
-    subscribeToReviews();
-    subscribeToOnlineUsers();
-    subscribeToFriendRequests();
-    renderMyProfileQR(); // pre-render
   }
+  
+  fetchReviewsInBounds();
+  subscribeToOnlineUsers();
+  renderMyProfileQR();
 
   if (!IS_FB) {
     setTimeout(() => toast('🎭 LocalMode — Thêm Firebase để sync bạn bè!', 'info', 4000), 600);
     loadLocalReviews();
-    loadDemoReviews();
   }
 }
 
@@ -643,6 +521,15 @@ function closeAddFriendModal() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function initMap() {
+  // Ensure #map has an explicit pixel height before Leaflet init
+  const mapEl = document.getElementById('map');
+  mapEl.style.width  = '100%';
+  mapEl.style.height = window.innerHeight + 'px';
+  window.addEventListener('resize', () => {
+    mapEl.style.height = window.innerHeight + 'px';
+    S.map?.invalidateSize(true);
+  });
+
   const center = S.lat ? [S.lat, S.lng] : MAP_CENTER_DEFAULT;
   S.map = L.map('map', {
     center, zoom: MAP_ZOOM_DEFAULT, zoomControl: false,
@@ -664,8 +551,14 @@ function initMap() {
   S.map.on('click', e => {
     if (S.addingMarker) { openAddReview(e.latlng.lat, e.latlng.lng); S.addingMarker = false; D.btnAddReview.style.background = ''; }
   });
+  
+  S.map.on('moveend', () => {
+    fetchReviewsInBounds();
+  });
+  
   window.addEventListener('resize', () => S.map.invalidateSize());
-  setTimeout(() => S.map.invalidateSize(), 200);
+  // Force map to recalculate dimensions at multiple intervals
+  [100, 300, 600, 1500].forEach(ms => setTimeout(() => S.map?.invalidateSize(true), ms));
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -674,9 +567,10 @@ function initMap() {
 
 function startGPS() {
   if (!navigator.geolocation) { setGPS('err', 'Không hỗ trợ GPS'); return; }
-  if (S.watchId) { navigator.geolocation.clearWatch(S.watchId); S.watchId = null; }
+  if (S.gpsIntervalId) { navigator.geolocation.clearWatch(S.gpsIntervalId); S.gpsIntervalId = null; }
   setGPS('searching', 'Đang lấy GPS...');
-  S.watchId = navigator.geolocation.watchPosition(
+  
+  S.gpsIntervalId = navigator.geolocation.watchPosition(
     ({ coords: { latitude: lat, longitude: lng, accuracy: acc } }) => {
       S.lat = lat; S.lng = lng;
       setGPS('ok', `GPS ± ${Math.round(acc)}m`);
@@ -691,7 +585,7 @@ function startGPS() {
       const m = {1:'Từ chối quyền GPS 😢', 2:'Mất tín hiệu GPS', 3:'Hết giờ GPS'};
       setGPS('err', m[err.code] || 'Lỗi GPS');
     },
-    { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
   );
 }
 
@@ -742,10 +636,10 @@ function renderUserMarker(user) {
   if (Date.now() - upd > USER_ONLINE_MS) { removeUserMarker(user.uid); return; }
 
   const color = getUserColor(user.uid);
-  const initial = (user.name || '?').charAt(0).toUpperCase();
+  const userIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:24px;height:24px;color:#fff;"><path fill-rule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clip-rule="evenodd" /></svg>`;
   const html = `<div class="user-avatar-marker" style="background:${color};border-color:${color}60;">
     <div class="user-avatar-ring" style="color:${color};border-color:${color};"></div>
-    <span>${initial}</span>
+    ${userIcon}
   </div>`;
 
   const icon = L.divIcon({ html, className:'', iconSize:[46,46], iconAnchor:[23,23] });
@@ -788,13 +682,22 @@ function createRevIcon(rev) {
   const name = rev.placeName.length > 20 ? rev.placeName.slice(0,18)+'…' : rev.placeName;
   const initial = (rev.userName || '?').charAt(0).toUpperCase();
   
+  const subReviews = rev.subReviews || [];
+  const reviewCount = 1 + subReviews.length;
+  let totalRating = rev.rating;
+  subReviews.forEach(sr => totalRating += (sr.rating || rev.rating));
+  const avgRating = Math.round(totalRating / reviewCount);
+
   let advice = '';
   let color = '';
-  if (rev.rating === 5) { advice = 'NÊN CHỌN'; color = '#22c55e'; }
-  else if (rev.rating === 4) { advice = 'ĐÁNG THỬ'; color = '#eab308'; }
-  else if (rev.rating === 3) { advice = 'CÂN NHẮC'; color = '#f59e0b'; }
-  else if (rev.rating === 2) { advice = 'CÂN NHẮC'; color = '#ef4444'; }
+  if (avgRating === 5) { advice = 'NÊN CHỌN'; color = '#22c55e'; }
+  else if (avgRating === 4) { advice = 'ĐÁNG THỬ'; color = '#eab308'; }
+  else if (avgRating === 3) { advice = 'CÂN NHẮC'; color = '#f59e0b'; }
+  else if (avgRating === 2) { advice = 'CÂN NHẮC'; color = '#ef4444'; }
   else { advice = 'KHÔNG NÊN CHỌN'; color = '#9f1239'; }
+
+  const reviewers = [rev.userName || 'Khách', ...subReviews.map(sr => sr.userName || 'Khách')];
+  const reviewersEscaped = reviewers.map(n => esc(n)).join('|');
 
   return L.divIcon({
     html: `
@@ -802,22 +705,23 @@ function createRevIcon(rev) {
         <div style="position:absolute; bottom:8px; left:50%; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; width:max-content; filter:drop-shadow(0 6px 12px rgba(0,0,0,0.5)); pointer-events:none;">
           
           <div style="display:flex; flex-direction:column; align-items:center; pointer-events:auto; transition:transform 0.2s;" onmouseenter="this.style.transform='scale(1.08)'" onmouseleave="this.style.transform='scale(1)'">
-            <div style="font-size:10px; font-weight:800; color:#fff; text-shadow:0 1px 4px rgba(0,0,0,0.9), 0 2px 8px rgba(0,0,0,0.9); margin-bottom:3px; opacity:0.9;">
-              @${esc(rev.userName || 'Khách')}
+            <div class="rev-name-label" data-names="${esc(reviewersEscaped)}" data-idx="0" style="font-size:10px; font-weight:800; color:#fff; text-shadow:0 1px 4px rgba(0,0,0,0.9), 0 2px 8px rgba(0,0,0,0.9); margin-bottom:3px; opacity:0.9; transition: opacity 0.3s;">
+              @${esc(reviewers[0])}
             </div>
             <div style="background:rgba(15,23,42,0.95); border:1px solid ${color}; padding:6px 10px; border-radius:14px; margin-bottom:8px; display:flex; flex-direction:column; align-items:center;">
               <div style="font-weight:900; font-size:14px; color:#fff;">${esc(name)}</div>
               ${rev.foodType ? `<div style="font-size:10px; color:rgba(255,255,255,0.7); margin-top:1px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">${esc(rev.foodType)}</div>` : ''}
               <div style="display:flex; gap:6px; align-items:center; margin-top:4px;">
-                <span style="color:${color}; font-weight:900; font-size:12px;">★ ${rev.rating}</span>
+                <span style="color:${color}; font-weight:900; font-size:12px;">★ ${avgRating}</span>
                 <span style="background:${color}; color:#fff; padding:3px 6px; border-radius:6px; font-size:9px; font-weight:900; letter-spacing:0.5px;">${advice}</span>
+                ${reviewCount > 1 ? `<span style="background:rgba(255,255,255,0.2); color:#fff; padding:3px 6px; border-radius:6px; font-size:9px; font-weight:900;">👤 ${reviewCount}</span>` : ''}
               </div>
             </div>
           </div>
 
           <div style="width:38px; height:38px; background:${color}; border-radius:50% 50% 50% 0; transform:rotate(-45deg); display:flex; align-items:center; justify-content:center; border:2px solid #fff; pointer-events:auto; box-shadow:inset 0 2px 6px rgba(0,0,0,0.3);">
             <div style="transform:rotate(45deg); width:28px; height:28px; background:#1e293b; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:900; color:#fff; font-size:14px; overflow:hidden;">
-              ${rev.userAvatar ? `<img src="${esc(rev.userAvatar)}" style="width:100%;height:100%;object-fit:cover;">` : initial}
+              ${rev.userAvatar ? `<img src="${esc(rev.userAvatar)}" style="width:100%;height:100%;object-fit:cover;">` : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;color:#94a3b8;"><path fill-rule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clip-rule="evenodd" /></svg>`}
             </div>
           </div>
 
@@ -840,39 +744,94 @@ function putRevMarker(rev) {
 function delRevMarker(id) { if (S.revMarkers[id]) { S.map?.removeLayer(S.revMarkers[id]); delete S.revMarkers[id]; } }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// §16 · FIRESTORE REVIEWS
+// §16 · FIRESTORE REVIEWS (BOUNDING BOX & FILTER)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function subscribeToReviews() {
-  if (!db) return;
-  const q = db.collection('reviews').orderBy('createdAt','desc').limit(500);
-  S.unsubReviews = q.onSnapshot(snap => {
-    snap.docChanges().forEach(ch => {
-      const d = { id: ch.doc.id, ...ch.doc.data() };
-      if (ch.type === 'added')    { S.reviews.push(d); putRevMarker(d); }
-      if (ch.type === 'modified') { const i=S.reviews.findIndex(r=>r.id===d.id); if(i>-1) S.reviews[i]=d; putRevMarker(d); }
-      if (ch.type === 'removed')  { S.reviews = S.reviews.filter(r=>r.id!==d.id); delRevMarker(d.id); }
+let _reviewFetchTimeout = null;
+
+function fetchReviewsInBounds() {
+  if (!db || !S.map) return;
+  
+  if (_reviewFetchTimeout) clearTimeout(_reviewFetchTimeout);
+  
+  _reviewFetchTimeout = setTimeout(() => {
+    const bounds = S.map.getBounds();
+    const sw = bounds.getSouthWest();
+    const ne = bounds.getNorthEast();
+    
+    if (S.unsubReviews) {
+      S.unsubReviews();
+      S.unsubReviews = null;
+    }
+    
+    const q = db.collection('reviews')
+      .where('lat', '>=', sw.lat)
+      .where('lat', '<=', ne.lat);
+      
+    S.unsubReviews = q.onSnapshot(snap => {
+      // 1. Convert snapshot to array
+      const fetchedDocs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // 2. Client-side filter: Longitude bounding only — mọi người đều thấy tất cả reviews
+      const validReviews = fetchedDocs.filter(rev => {
+        // Filter out of bounds longitude
+        if (rev.lng < sw.lng || rev.lng > ne.lng) return false;
+        return true;
+      });
+      
+      // 3. Diff with current S.reviews to add/update/remove markers
+      const newIds = new Set(validReviews.map(r => r.id));
+      
+      // Remove markers not in validReviews
+      S.reviews = S.reviews.filter(existingRev => {
+        if (!newIds.has(existingRev.id)) {
+          delRevMarker(existingRev.id);
+          return false;
+        }
+        return true;
+      });
+      
+      // Add or update markers
+      validReviews.forEach(newRev => {
+        const existingIdx = S.reviews.findIndex(r => r.id === newRev.id);
+        if (existingIdx > -1) {
+          // Update
+          S.reviews[existingIdx] = newRev;
+          putRevMarker(newRev); // putRevMarker removes old and adds new
+        } else {
+          // Add
+          S.reviews.push(newRev);
+          putRevMarker(newRev);
+        }
+      });
+      
+      updateRevBadge();
+    }, err => {
+      console.error(err);
+      // toast('⚠️ Lỗi tải bản đồ', 'err');
     });
-    updateRevBadge();
-  }, err => { console.error(err); toast('⚠️ Mất kết nối server', 'err'); });
+    
+  }, 300); // 300ms debounce
 }
 
+
 async function submitReview() {
+  const customName = D.inpReviewerName ? D.inpReviewerName.value.trim() : '';
   const placeName = D.inpPlaceName.value.trim();
   const foodType  = D.inpFoodType ? D.inpFoodType.value.trim() : '';
   const address   = D.inpAddress ? D.inpAddress.value.trim() : '';
   const rating    = S.selStars;
   const note      = D.inpNote.value.trim();
   const lat       = S.selLat, lng = S.selLng;
+  const userName  = customName || S.user?.name || 'Ẩn danh';
 
   if (!placeName)    { toast('⚠️ Nhập tên quán đi bạn!', 'err'); shake(D.inpPlaceName); D.inpPlaceName.focus(); return; }
   if (!rating)       { toast('⭐ Chọn số sao!', 'err'); shake(D.starPicker); return; }
   if (!lat || !lng)  { toast('📍 Chọn vị trí trên bản đồ!', 'err'); return; }
-  if (!S.user)       { toast('🔐 Chưa đăng nhập!', 'err'); return; }
 
   setRevSubmitLoading(true);
   try {
-    const rev = { userId:S.user.uid, userName:S.user.name, placeName, foodType, address, lat, lng, rating, note,
+    const rev = { userId:S.user.uid, userName, placeName, foodType, address, lat, lng, rating, note, editCount: 0,
       createdAt: db ? firebase.firestore.FieldValue.serverTimestamp() : { toDate:()=>new Date() },
     };
     if (db) {
@@ -902,105 +861,59 @@ async function deleteReview(id) {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// §17 · FRIEND SYSTEM
+// §17 · FRIEND CONNECTION LOGIC
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function loadLocalFriends() {
-  try { S.friends = JSON.parse(localStorage.getItem(LS_FRIENDS_KEY) || '[]'); } catch { S.friends = []; }
-}
-function saveLocalFriends() { localStorage.setItem(LS_FRIENDS_KEY, JSON.stringify(S.friends)); }
-function isFriend(uid) { return S.friends.some(f => f.uid === uid); }
-
 /** Handle QR data that was scanned/uploaded as a friend QR */
-function handleFriendQR(raw) {
+function handleFriendQR(rawText) {
   closeAddFriendModal();
   try {
-    const d = JSON.parse(raw);
-    if (d?.app !== QR_APP_ID || !d?.uid || !d?.name) throw new Error('bad');
-    if (d.uid === S.user?.uid) { toast('🤦 Đó là mã QR của bạn rồi!', 'info'); return; }
-    if (isFriend(d.uid)) { toast('✅ Đã là bạn bè rồi!', 'ok'); return; }
-    sendFriendRequest(d.uid, d.name);
-  } catch {
-    toast('❌ Mã QR không đúng định dạng!', 'err');
-  }
-}
-
-async function sendFriendRequest(toUid, toName) {
-  if (!S.user) return;
-  if (db) {
-    // Check if request already exists
-    try {
-      const dup = await db.collection('friendRequests')
-        .where('fromUid','==',S.user.uid).where('toUid','==',toUid).where('status','==','pending').get();
-      if (!dup.empty) { toast('⏳ Đã gửi yêu cầu rồi!', 'info'); return; }
-      await db.collection('friendRequests').add({
-        fromUid: S.user.uid, fromName: S.user.name,
-        toUid, toName, status: 'pending',
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      });
-      toast(`✉️ Đã gửi yêu cầu kết bạn tới ${toName}!`, 'ok', 3000);
-    } catch (e) { toast('❌ Gửi yêu cầu thất bại', 'err'); }
-  } else {
-    // Local mode: directly add as friend (no request flow)
-    if (!isFriend(toUid)) {
-      S.friends.push({ uid: toUid, name: toName });
-      saveLocalFriends();
-      refreshMyProfileFriendList();
-      toast(`🤝 Đã thêm ${toName} (Local Mode)!`, 'ok');
+    const url = new URL(rawText);
+    const uid = url.searchParams.get('add_friend');
+    if (uid) {
+      processAddFriend(uid);
+    } else {
+      throw new Error('Not a friend URL');
     }
+  } catch {
+    toast('❌ Mã QR không hợp lệ!', 'err');
   }
 }
 
-async function acceptFriendRequest(reqId, fromUid, fromName) {
-  if (!db) return;
-  try {
-    const batch = db.batch();
-    batch.update(db.collection('friendRequests').doc(reqId), { status: 'accepted' });
-    batch.update(db.collection('users').doc(S.user.uid), {
-      friends: firebase.firestore.FieldValue.arrayUnion(fromUid),
-    });
-    batch.update(db.collection('users').doc(fromUid), {
-      friends: firebase.firestore.FieldValue.arrayUnion(S.user.uid),
-    });
-    await batch.commit();
-    if (!isFriend(fromUid)) { S.friends.push({ uid: fromUid, name: fromName }); saveLocalFriends(); }
-    toast(`🤝 Đã kết bạn với ${fromName}!`, 'ok');
-    refreshMyProfileFriendList();
-  } catch (e) { toast('❌ Thất bại', 'err'); }
-}
 
-async function rejectFriendRequest(reqId) {
-  if (!db) return;
-  try {
-    await db.collection('friendRequests').doc(reqId).update({ status: 'rejected' });
-    S.friendReqs = S.friendReqs.filter(r => r.id !== reqId);
-    refreshMyProfileFriendList();
-  } catch { toast('❌ Thất bại', 'err'); }
-}
-
-function subscribeToFriendRequests() {
+async function processAddFriend(targetUid) {
   if (!db || !S.user) return;
-  S.unsubFriendReqs = db.collection('friendRequests')
-    .where('toUid','==',S.user.uid).where('status','==','pending')
-    .onSnapshot(snap => {
-      S.friendReqs = snap.docs.map(d => ({ id:d.id, ...d.data() }));
-      updateFriendBadge();
-      refreshMyProfileFriendList();
+  if (targetUid === S.user.uid) { toast('❌ Không thể tự kết bạn với chính mình!', 'err'); return; }
+  
+  if (S.friends.includes(targetUid)) { toast('✅ Hai bạn đã là bạn bè!', 'info'); return; }
+
+  try {
+    toast('⏳ Đang xử lý kết bạn...', 'info');
+    
+    // Add targetUid to my friends
+    await db.collection('users').doc(S.user.uid).update({
+      friends: firebase.firestore.FieldValue.arrayUnion(targetUid)
     });
 
-  // Also listen to accepted requests to sync friends
-  db.collection('friendRequests').where('fromUid','==',S.user.uid).where('status','==','accepted')
-    .onSnapshot(snap => {
-      snap.docs.forEach(d => {
-        const data = d.data();
-        if (!isFriend(data.toUid)) {
-          S.friends.push({ uid:data.toUid, name:data.toName });
-          saveLocalFriends();
-          toast(`🎉 ${data.toName} chấp nhận kết bạn!`, 'ok', 3000);
-        }
-      });
-      refreshMyProfileFriendList();
+    // Add myUid to target's friends (Requires Security Rules to allow)
+    await db.collection('users').doc(targetUid).update({
+      friends: firebase.firestore.FieldValue.arrayUnion(S.user.uid)
     });
+    
+    toast('🎉 Kết bạn thành công!', 'ok');
+    
+    // Clean up URL if needed
+    const url = new URL(window.location);
+    url.searchParams.delete('add_friend');
+    window.history.replaceState({}, document.title, url.pathname + url.search);
+    
+    // Force reload map logic (will be handled by the bounds logic in Phase 4)
+    if (S.map) S.map.fire('moveend');
+
+  } catch (e) {
+    console.error(e);
+    toast('❌ Lỗi kết bạn! Kiểm tra quyền truy cập.', 'err');
+  }
 }
 
 function updateFriendBadge() {
@@ -1067,34 +980,82 @@ function setRevSubmitLoading(on) {
 function openRevDetailSheet(rev) {
   const isOwn = S.user?.uid === rev.userId;
   const date  = rev.createdAt?.toDate ? fmtDate(rev.createdAt.toDate()) : 'Vừa xong';
-  const sc    = {5:'#22c55e',4:'#eab308',3:'#f59e0b',2:'#ef4444',1:'#ef4444'}[rev.rating]||'#eab308';
+  
+  const subReviews = rev.subReviews || [];
+  const reviewCount = 1 + subReviews.length;
+  let totalRating = rev.rating;
+  subReviews.forEach(sr => totalRating += (sr.rating || rev.rating));
+  const avgRating = Math.round(totalRating / reviewCount);
+  
+  const sc    = {5:'#22c55e',4:'#eab308',3:'#f59e0b',2:'#ef4444',1:'#ef4444'}[avgRating]||'#eab308';
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${rev.lat},${rev.lng}`;
 
+  let subHTML = '';
+  if (subReviews.length > 0) {
+    subHTML = `<div class="mt-4 pt-4 border-t border-slate-700/50">
+      <div class="flex justify-between items-center mb-3">
+        <h4 class="text-sm font-bold text-slate-300">Đánh giá khác (${subReviews.length})</h4>
+      </div>
+      <div class="flex flex-col gap-3 max-h-48 overflow-y-auto pr-1">
+        ${subReviews.map(sr => {
+          const srDate = sr.createdAt?.toDate ? fmtDate(sr.createdAt.toDate()) : 'Vừa xong';
+          const isOwnSr = (S.user && sr.userId === S.user.uid);
+          const srEditBtn = (isOwnSr && (sr.editCount || 0) < 3) ? 
+            `<button onclick="openEditModal(true, '${rev.id}', '${sr.id}', ${sr.rating||rev.rating}, \`${esc(sr.note).replace(/`/g,'\\\\`')}\`, ${sr.editCount||0})" class="text-[10px] bg-slate-700/80 hover:bg-slate-600 text-slate-300 px-2 py-0.5 rounded transition-colors ml-auto flex items-center gap-1">✏️ Sửa</button>` : '';
+          
+          return `<div class="bg-slate-800/50 rounded-xl p-3 border border-slate-700/50 relative">
+            <div class="flex items-center gap-2 mb-2">
+              <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white bg-slate-600">
+                ${(sr.userName||'?').charAt(0).toUpperCase()}
+              </div>
+              <span class="text-xs font-semibold text-slate-300">${esc(sr.userName)}</span>
+              <span class="text-[10px] font-bold ml-2" style="color:${sc}">★ ${sr.rating || rev.rating}</span>
+              <span class="text-[10px] text-slate-500 ml-auto">${srDate}</span>
+            </div>
+            <p class="text-sm text-slate-200">${esc(sr.note)}</p>
+            ${srEditBtn ? `<div class="mt-2 flex justify-end">${srEditBtn}</div>` : ''}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
+
   D.reviewDetailContent.innerHTML = `
-    <div class="flex gap-3 mb-5">
+    <div class="absolute top-0 right-5 text-[10px] font-bold text-slate-400 bg-slate-800/80 px-2 py-1 rounded-b-lg border-b border-l border-r border-slate-700/50 shadow-md">
+      Người đánh giá đầu tiên: <span class="text-white">@${esc(rev.userName || 'Foodie')}</span>
+    </div>
+    <div class="flex gap-3 mb-5 mt-2">
       <div class="w-14 h-14 rounded-2xl flex flex-col items-center justify-center flex-shrink-0" style="background:${sc}18;border:1.5px solid ${sc}44;">
-        <span class="text-2xl font-black" style="color:${sc};">${rev.rating}</span>
+        <span class="text-2xl font-black" style="color:${sc};">${avgRating}</span>
         <span class="text-[10px] font-bold" style="color:${sc};">SAO</span>
       </div>
       <div class="flex-1 min-w-0">
-        <h3 class="text-xl font-black text-white leading-tight">${esc(rev.placeName)}</h3>
+        <div class="flex items-center gap-2">
+          <h3 class="text-xl font-black text-white leading-tight">${esc(rev.placeName)}</h3>
+          ${reviewCount > 1 ? `<span class="bg-slate-700 text-white text-xs font-bold px-2 py-0.5 rounded-full">👤 ${reviewCount}</span>` : ''}
+        </div>
         ${rev.foodType ? `<p class="text-xs text-slate-300 mt-1 font-semibold uppercase tracking-wider">🏷️ ${esc(rev.foodType)}</p>` : ''}
-        <p class="text-sm mt-0.5" style="color:${sc};">${STAR_LABELS[rev.rating]||''}</p>
+        <p class="text-sm mt-0.5" style="color:${sc};">${STAR_LABELS[avgRating]||''}</p>
       </div>
     </div>
     <div class="text-2xl mb-4 tracking-widest" style="color:${sc};">
-      ${'★'.repeat(rev.rating)}<span class="text-slate-700">${'★'.repeat(5-rev.rating)}</span>
+      ${'★'.repeat(avgRating)}<span class="text-slate-700">${'★'.repeat(5-avgRating)}</span>
     </div>
     ${rev.address?`<div class="flex items-start gap-2 mb-4 text-slate-300 text-sm">
       <span class="text-slate-500 mt-0.5">📍</span><span>${esc(rev.address)}</span>
     </div>`:''}
-    ${rev.note?`<div class="rounded-2xl p-4 mb-4" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);">
+    ${rev.note?`<div class="rounded-2xl p-4 mb-4 relative" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);">
       <p class="text-xs font-bold text-slate-400 mb-1 uppercase tracking-widest">📝 Ghi chú</p>
-      <p class="text-slate-200 text-sm leading-relaxed">${esc(rev.note)}</p></div>`:''}
-    <div class="flex items-center gap-3 mb-5 rounded-2xl p-3" style="background:rgba(255,255,255,.04);">
+      <p class="text-slate-200 text-sm leading-relaxed">${esc(rev.note)}</p>
+      ${(S.user && rev.userId === S.user.uid && (rev.editCount || 0) < 3) ? 
+        `<div class="mt-3 flex justify-end"><button onclick="openEditModal(false, '${rev.id}', null, ${rev.rating}, \`${esc(rev.note).replace(/`/g,'\\\\`')}\`, ${rev.editCount||0})" class="text-[10px] bg-slate-700/80 hover:bg-slate-600 text-slate-300 px-2 py-1 rounded transition-colors flex items-center gap-1">✏️ Sửa</button></div>` : ''}
+    </div>`:''}
+    <div class="flex items-center gap-3 mb-1 rounded-2xl p-3" style="background:rgba(255,255,255,.04);">
       <div class="avatar-circle" style="background:linear-gradient(135deg,#f97316,#fb923c);">${(rev.userName||'?').charAt(0).toUpperCase()}</div>
       <div><p class="text-sm font-semibold text-white">@${esc(rev.userName||'Foodie')}</p><p class="text-xs text-slate-400">${date}</p></div>
     </div>
+    ${subHTML}
+    <button onclick="openSubReviewModal('${rev.id}')" class="w-full mt-3 mb-4 py-3.5 rounded-2xl font-bold text-sm text-orange-400 border border-orange-500/30 bg-orange-500/10 flex items-center justify-center gap-2">✍️ Thêm đánh giá</button>
     <div class="flex gap-2 mt-1">
       <a href="${mapsUrl}" target="_blank" rel="noopener"
         class="flex-1 py-3.5 rounded-2xl font-semibold text-sm text-white text-center flex items-center justify-center gap-1.5"
@@ -1117,6 +1078,109 @@ window.locateRevOnMap = function(id) {
 };
 window.deleteReview = deleteReview;
 
+// Sub-review functions
+let currentTargetRevId = null;
+let currentSubStars = 0;
+
+function updateSubStarUI() {
+  document.querySelectorAll('.star-btn-sub').forEach(b => {
+    const s = parseInt(b.dataset.star);
+    b.style.transform = s <= currentSubStars ? 'scale(1.15)' : 'scale(1)';
+    b.style.filter = s <= currentSubStars ? 'drop-shadow(0 0 8px rgba(250,204,21,0.6))' : 'grayscale(1) opacity(0.3)';
+  });
+  const label = document.getElementById('star-label-sub');
+  if (label) {
+    label.textContent = STAR_LABELS[currentSubStars] || 'Chưa chọn sao';
+    label.style.color = currentSubStars ? '#eab308' : '#64748b';
+  }
+}
+
+document.querySelectorAll('.star-btn-sub').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    currentSubStars = parseInt(e.currentTarget.dataset.star);
+    updateSubStarUI();
+  });
+});
+
+window.openSubReviewModal = function(id) {
+  currentTargetRevId = id;
+  currentSubStars = 0;
+  updateSubStarUI();
+  
+  D.inpSubReviewerName.value = S.user?.name || '';
+  D.chkAnonSubReview.checked = false;
+  D.inpSubReviewNote.value = '';
+  openBS(D.ovAddSubReview, D.shAddSubReview);
+};
+
+D.chkAnonSubReview.addEventListener('change', (e) => {
+  if (e.target.checked) {
+    D.inpSubReviewerName.value = 'Ẩn danh';
+    D.inpSubReviewerName.disabled = true;
+  } else {
+    D.inpSubReviewerName.value = S.user?.name || '';
+    D.inpSubReviewerName.disabled = false;
+  }
+});
+
+D.btnCloseSubReview.onclick = () => closeBS(D.ovAddSubReview, D.shAddSubReview);
+
+D.btnSubmitSubReview.onclick = async () => {
+  if (!currentTargetRevId) return;
+  if (!currentSubStars) { toast('⚠️ Bạn chưa chọn số sao!', 'err'); shake(document.getElementById('star-picker-sub')); return; }
+  const note = D.inpSubReviewNote.value.trim();
+  if (!note) { toast('⚠️ Vui lòng nhập nội dung đánh giá!', 'err'); shake(D.inpSubReviewNote); return; }
+  
+  let userName = D.inpSubReviewerName.value.trim();
+  if (!userName) userName = 'Ẩn danh';
+  
+  const subReview = {
+    id: `sr-${Date.now()}`,
+    userId: S.user.uid,
+    editCount: 0,
+    userName: userName,
+    rating: currentSubStars,
+    note: note,
+    createdAt: db ? firebase.firestore.FieldValue.serverTimestamp() : { toDate: () => new Date() }
+  };
+
+  const btn = D.btnSubmitSubReview;
+  const origHtml = btn.innerHTML;
+  btn.innerHTML = '<div class="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>';
+  btn.disabled = true;
+
+  try {
+    if (db) {
+      await db.collection('reviews').doc(currentTargetRevId).update({
+        subReviews: firebase.firestore.FieldValue.arrayUnion(subReview)
+      });
+    }
+
+    // Always update local state for instant feedback
+    const rev = S.reviews.find(r => r.id === currentTargetRevId);
+    if (rev) {
+      if (!rev.subReviews) rev.subReviews = [];
+      const localSubReview = { ...subReview, createdAt: { toDate: () => new Date() } };
+      rev.subReviews.push(localSubReview);
+      if (!db) saveLocalReviews();
+      
+      // Update UI
+      putRevMarker(rev);
+      openRevDetailSheet(rev);
+    }
+    
+    toast('🎉 Gửi đánh giá thành công!', 'ok');
+    closeBS(D.ovAddSubReview, D.shAddSubReview);
+    
+  } catch (err) {
+    console.error(err);
+    toast('⚠️ Lỗi gửi đánh giá', 'err');
+  } finally {
+    btn.innerHTML = origHtml;
+    btn.disabled = false;
+  }
+};
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // §20 · UI — MY PROFILE SHEET
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1134,27 +1198,9 @@ function refreshMyProfileFriendList() {
   D.statReqCount.textContent = S.friendReqs.length;
   updateFriendBadge();
 
-  // Friend requests
-  if (S.friendReqs.length > 0) {
-    D.friendReqsSection.classList.remove('hidden');
-    D.friendReqList.innerHTML = S.friendReqs.map(req => `
-      <div class="friend-req-item">
-        <div class="avatar-circle" style="background:${getUserColor(req.fromUid)};">${req.fromName.charAt(0).toUpperCase()}</div>
-        <div class="flex-1 min-w-0">
-          <p class="text-sm font-bold text-white truncate">@${esc(req.fromName)}</p>
-          <p class="text-xs text-slate-400">muốn kết bạn với bạn</p>
-        </div>
-        <div class="flex gap-2">
-          <button onclick="acceptFriendRequest('${req.id}','${req.fromUid}','${req.fromName}')"
-            class="px-3 py-1.5 rounded-xl text-xs font-bold text-white" style="background:#22c55e;">✓</button>
-          <button onclick="rejectFriendRequest('${req.id}')"
-            class="px-3 py-1.5 rounded-xl text-xs font-bold text-red-400 bg-red-500/10">✗</button>
-        </div>
-      </div>`).join('');
-  } else {
-    D.friendReqsSection.classList.add('hidden');
-    D.friendReqList.innerHTML = '';
-  }
+  // Friend requests (Removed as we now auto-accept via arrayUnion)
+  D.friendReqsSection.classList.add('hidden');
+  D.friendReqList.innerHTML = '';
 
   // Friends list
   if (S.friends.length > 0) {
@@ -1169,9 +1215,6 @@ function refreshMyProfileFriendList() {
     D.friendsList.innerHTML = '';
   }
 }
-
-window.acceptFriendRequest = acceptFriendRequest;
-window.rejectFriendRequest = rejectFriendRequest;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // §21 · UI — USER PROFILE SHEET (avatar marker tap)
@@ -1225,7 +1268,8 @@ async function openUserProfileSheet(user) {
     if (wrap) { wrap.innerHTML = ''; wrap.appendChild(tmpCanvas); }
   } catch {}
 }
-window.sendFriendRequest = sendFriendRequest;
+// sendFriendRequest is now handled via processAddFriend (QR/URL flow)
+window.sendFriendRequest = function(targetUid) { processAddFriend(targetUid); };
 window.closeUserProfile = closeUserProfile;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1328,32 +1372,30 @@ function addRipple(el) {
   });
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// §24 · DEMO DATA (LocalMode only)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-const DEMO = [
-  {id:'d1',userId:'demo',userName:'NgonFoodie#2847',placeName:'Phở Bò Thìn',       lat:21.0295,lng:105.8530,rating:5,note:'Phải order phở đặc biệt! Ngon nhất Hà Nội 🔥',      createdAt:{toDate:()=>new Date(Date.now()-3600e3)}},
-  {id:'d2',userId:'demo',userName:'MlemEater#9123', placeName:'Bún Chả Obama',      lat:21.0275,lng:105.8555,rating:5,note:'Nơi Obama từng ăn! Bún chả + nem rán chuẩn vị 🇺🇸', createdAt:{toDate:()=>new Date(Date.now()-7200e3)}},
-  {id:'d3',userId:'demo',userName:'ChillChef#4401', placeName:'Bánh Mì 25',         lat:21.0310,lng:105.8510,rating:4,note:'Bánh mì pate ngon + giá rất hợp lý',               createdAt:{toDate:()=>new Date(Date.now()-86400e3)}},
-  {id:'d4',userId:'demo',userName:'HotKing#7772',   placeName:'Cơm Tấm Sài Gòn',    lat:21.0260,lng:105.8580,rating:4,note:'Sườn dày, cơm tấm authentic, ngon thật sự 😋',      createdAt:{toDate:()=>new Date(Date.now()-172800e3)}},
-  {id:'d5',userId:'demo',userName:'NgonFoodie#2847',placeName:'Quán Mắm Kinh Hoàng',lat:21.0320,lng:105.8500,rating:2,note:'Mùi quá nồng, không phải khẩu vị mình 😅',         createdAt:{toDate:()=>new Date(Date.now()-259200e3)}},
-  {id:'d6',userId:'demo',userName:'MlemEater#9123', placeName:'Bún Bò Huế Ngọc',    lat:21.0240,lng:105.8565,rating:5,note:'Bún bò đậm vị nhất HN! Phải thêm huyết nha 🔥',    createdAt:{toDate:()=>new Date(Date.now()-18000e3)}},
-  {id:'d7',userId:'demo',userName:'YummyStar#3390', placeName:'Trà Sữa Gong Cha',   lat:21.0285,lng:105.8545,rating:3,note:'Ổn nhưng hơi ngọt, nhớ order ít đường thôi',       createdAt:{toDate:()=>new Date(Date.now()-43200e3)}},
-];
-
-function loadDemoReviews() {
-  if (S.reviews.some(r=>r.id==='d1')) return; // already loaded
-  DEMO.forEach(r=>{ 
-    if (!S.reviews.some(x=>x.id===r.id)) { S.reviews.push(r); putRevMarker(r); } 
-  });
-  updateRevBadge();
-}
+// DEMO DATA REMOVED
 
 function saveLocalReviews() {
-  const rs = S.reviews.filter(r => String(r.id).startsWith('loc-')).map(r => ({
-    ...r, createdAt: r.createdAt?.toDate ? r.createdAt.toDate().toISOString() : new Date().toISOString()
-  }));
+  const safeIso = (t) => {
+    try {
+      if (t && t.toDate) {
+        const d = t.toDate();
+        if (!isNaN(d)) return d.toISOString();
+      }
+    } catch(e){}
+    return new Date().toISOString();
+  };
+
+  const rs = S.reviews.filter(r => String(r.id).startsWith('loc-')).map(r => {
+    const cloned = { ...r };
+    cloned.createdAt = safeIso(r.createdAt);
+    if (cloned.subReviews) {
+      cloned.subReviews = cloned.subReviews.map(sr => ({
+        ...sr,
+        createdAt: safeIso(sr.createdAt)
+      }));
+    }
+    return cloned;
+  });
   localStorage.setItem('localReviews', JSON.stringify(rs));
 }
 
@@ -1361,7 +1403,14 @@ function loadLocalReviews() {
   try {
     const rs = JSON.parse(localStorage.getItem('localReviews') || '[]');
     rs.forEach(r => {
-      r.createdAt = { toDate: () => new Date(r.createdAt) };
+      const dtStr = r.createdAt;
+      r.createdAt = { toDate: () => new Date(dtStr) };
+      if (r.subReviews) {
+        r.subReviews.forEach(sr => {
+          const sdtStr = sr.createdAt;
+          sr.createdAt = { toDate: () => new Date(sdtStr) };
+        });
+      }
       if (!S.reviews.some(x=>x.id===r.id)) { S.reviews.push(r); putRevMarker(r); }
     });
     updateRevBadge();
@@ -1372,62 +1421,50 @@ function loadLocalReviews() {
 // §25 · EVENT LISTENERS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+/**
+ * Khởi tạo user ẩn danh — tạo 1 lần, lưu localStorage mãi.
+ * Ai vào trang cũng được vào thẳng bản đồ không cần đăng nhập.
+ */
 function loginAsGuest() {
-  const uid  = 'guest-' + Date.now();
-  const name = 'Khách viếng thăm';
-  const user = { uid, name, createdAt: Date.now() };
-  S.user = user;
-  toast('👋 Đang xem với tư cách Khách!', 'ok', 2500);
+  const saved = localStorage.getItem(LS_USER_KEY);
+  if (saved) {
+    try {
+      S.user = JSON.parse(saved);
+    } catch(e) { localStorage.removeItem(LS_USER_KEY); }
+  }
+  
+  if (!S.user) {
+    // Tạo user mới với nickname ngẫu nhiên
+    const n = NAME_P[Math.floor(Math.random()*NAME_P.length)];
+    const s = NAME_S[Math.floor(Math.random()*NAME_S.length)];
+    const tag = Math.floor(1000 + Math.random()*9000);
+    const uid = 'anon-' + Math.random().toString(36).slice(2,10);
+    S.user = {
+      uid,
+      name: `${n} ${s}`,
+      username: `@${n}${s}#${tag}`,
+      createdAt: Date.now()
+    };
+    localStorage.setItem(LS_USER_KEY, JSON.stringify(S.user));
+  }
+  
   showMainApp();
 }
 
 function setupEvents() {
-
-  // ── LOGIN: Home ──
-  D.btnHomeCreate.addEventListener('click', createAccount);
-  D.btnHomeLogin .addEventListener('click', () => showLoginSub('login'));
-  D.btnHomeSkip?.addEventListener('click', loginAsGuest);
-
-  // ── LOGIN: QR Show ──
-  D.btnBackQr.addEventListener('click', () => showLoginSub('home'));
-  D.btnDownloadQr.addEventListener('click', () => {
-    if (!S.user) return;
-    downloadQRCard(D.qrLoginCanvas, S.user.name, 'login');
-  });
-  D.btnEnterApp.addEventListener('click', () => showMainApp());
-  addRipple(D.btnEnterApp);
-
-  // ── LOGIN: Upload ──
-  D.btnBackLogin.addEventListener('click', () => showLoginSub('home'));
-  D.btnUploadLoginTrigger.addEventListener('click', () => D.qrUploadLogin.click());
-  D.qrUploadLogin.addEventListener('change', async e => {
-    const file = e.target.files?.[0]; if (!file) return;
-    D.loginUploadStatus.classList.remove('hidden');
-    try {
-      const data = await parseQRFromFile(file);
-      loginFromQRData(data);
-    } catch {
-      toast('❌ Không tìm thấy mã QR trong ảnh!', 'err');
-    } finally {
-      D.loginUploadStatus.classList.add('hidden');
-      e.target.value = '';
-    }
-  });
-
-  // ── LOGIN: Camera ──
-  D.btnLoginCamera.addEventListener('click', () => showLoginSub('scan'));
-  D.btnBackScan  .addEventListener('click', () => showLoginSub('login'));
-
   // ── MAIN: Header ──
   D.btnMyProfile    .addEventListener('click', () => { openMyProfile(); refreshMyProfileFriendList(); });
-  D.btnFriendsHeader.addEventListener('click', () => { openMyProfile(); refreshMyProfileFriendList(); });
+  D.btnInfoHeader.addEventListener('click', () => openBS(D.ovInfoModal, D.shInfoModal));
+  if (D.btnCloseInfoModal) {
+    D.btnCloseInfoModal.addEventListener('click', () => closeBS(D.ovInfoModal, D.shInfoModal));
+    D.ovInfoModal.addEventListener('click', e => { if (e.target === D.ovInfoModal) closeBS(D.ovInfoModal, D.shInfoModal); });
+  }
 
   // ── MY PROFILE SHEET ──
   D.btnCloseMyProfile.addEventListener('click', closeMyProfile);
   D.ovMyProfile.addEventListener('click', e => { if(e.target===D.ovMyProfile) closeMyProfile(); });
   D.btnDownloadMyQr .addEventListener('click', () => downloadQRCard(D.myProfileQrCanvas, S.user?.name||'user', 'friend'));
-  D.btnOpenAddFriend.addEventListener('click', openAddFriendModal);
-  D.btnLogout       .addEventListener('click', () => { if(confirm('Đăng xuất khỏi FOOD DROP?')) logout(); });
+  D.btnOpenAddFriend?.addEventListener('click', openAddFriendModal);
 
   // Swipe down close
   let _mySY=0;
@@ -1474,6 +1511,156 @@ function setupEvents() {
   D.starPicker.addEventListener('click', e => { const b=e.target.closest('.star-btn'); if(b) pickStar(+b.dataset.star); });
   D.btnSubmitReview.addEventListener('click', submitReview);
   D.inpPlaceName.addEventListener('keydown', e => { if(e.key==='Enter') D.inpNote.focus(); });
+  D.inpPlaceName.addEventListener('input', () => {
+    const v = D.inpPlaceName.value.trim().toLowerCase();
+    if (!v) {
+      D.placeSuggestions.innerHTML = '';
+      D.placeSuggestions.classList.add('hidden');
+      return;
+    }
+    const matches = S.reviews.filter(r => 
+      (r.placeName||'').toLowerCase().includes(v) || (r.address||'').toLowerCase().includes(v)
+    ).slice(0, 5);
+    if (matches.length === 0) {
+      D.placeSuggestions.innerHTML = '';
+      D.placeSuggestions.classList.add('hidden');
+      return;
+    }
+    D.placeSuggestions.innerHTML = matches.map(r => `
+      <div class="p-3 border-b border-slate-700/50 hover:bg-slate-700 cursor-pointer flex items-center justify-between" onclick="selectSuggestion('${r.id}')">
+        <div>
+          <div class="text-sm font-bold text-white">${esc(r.placeName)}</div>
+          <div class="text-xs text-slate-400 mt-0.5">📍 ${esc(r.address || 'Không rõ địa chỉ')}</div>
+        </div>
+        <div class="text-[10px] bg-slate-600 px-2 py-1 rounded text-white font-semibold">Đã có</div>
+      </div>
+    `).join('');
+    D.placeSuggestions.classList.remove('hidden');
+  });
+
+  window.selectSuggestion = (id) => {
+    const rev = S.reviews.find(r => r.id === id);
+    if (!rev) return;
+    D.placeSuggestions.classList.add('hidden');
+    closeAddReview();
+    S.map.flyTo([rev.lat, rev.lng], 17, {animate: true});
+    setTimeout(() => openRevDetailSheet(rev), 400);
+  };
+  
+  // EDIT REVIEW LOGIC
+  window.openEditModal = function(isSubReview, revId, subRevId, currentRating, currentNote, currentEditCount) {
+    S.editTarget = { isSubReview, revId, subRevId };
+    S.editStars = currentRating;
+    S.editMaxCount = 3;
+    S.editCount = currentEditCount || 0;
+    
+    if (S.editCount >= S.editMaxCount) {
+      toast('Bạn đã hết lượt sửa!', 'err');
+      return;
+    }
+    
+    D.editCountLabel.textContent = `Bạn còn ${S.editMaxCount - S.editCount} lần sửa`;
+    D.inpEditReviewNote.value = currentNote;
+    
+    document.querySelectorAll('.star-btn-edit').forEach(b => {
+      const s = parseInt(b.dataset.star);
+      if (s <= S.editStars) {
+        b.style.color = '#eab308';
+        b.style.transform = 'scale(1.15)';
+        b.style.filter = 'drop-shadow(0 0 8px rgba(250,204,21,0.6))';
+      } else {
+        b.style.color = '';
+        b.style.transform = 'scale(1)';
+        b.style.filter = 'grayscale(1) opacity(0.3)';
+      }
+    });
+    D.starLabelEdit.textContent = STAR_LABELS[S.editStars] || 'Chưa chọn sao';
+    D.starLabelEdit.style.color = S.editStars ? '#eab308' : '#64748b';
+    
+    openBS(D.ovEditReview, D.shEditReview);
+  };
+
+  if (D.btnCloseEditReview) {
+    D.btnCloseEditReview.addEventListener('click', () => closeBS(D.ovEditReview, D.shEditReview));
+    D.ovEditReview.addEventListener('click', e => { if (e.target === D.ovEditReview) closeBS(D.ovEditReview, D.shEditReview); });
+    
+    document.querySelectorAll('.star-btn-edit').forEach(b => {
+      b.addEventListener('click', e => {
+        S.editStars = parseInt(e.currentTarget.dataset.star);
+        document.querySelectorAll('.star-btn-edit').forEach(btn => {
+          const s = parseInt(btn.dataset.star);
+          if (s <= S.editStars) {
+            btn.style.color = '#eab308';
+            btn.style.transform = 'scale(1.15)';
+            btn.style.filter = 'drop-shadow(0 0 8px rgba(250,204,21,0.6))';
+          } else {
+            btn.style.color = '';
+            btn.style.transform = 'scale(1)';
+            btn.style.filter = 'grayscale(1) opacity(0.3)';
+          }
+        });
+        D.starLabelEdit.textContent = STAR_LABELS[S.editStars] || 'Chưa chọn sao';
+        D.starLabelEdit.style.color = S.editStars ? '#eab308' : '#64748b';
+      });
+    });
+
+    D.btnSubmitEditReview.addEventListener('click', async () => {
+      console.log('--- Submit Edit Review Clicked ---');
+      const note = D.inpEditReviewNote.value.trim();
+      console.log('Stars:', S.editStars, 'Note:', note);
+      if (!S.editStars) { toast('Vui lòng chọn số sao!', 'err'); return; }
+      if (!note) { toast('Vui lòng nhập nội dung!', 'err'); return; }
+      
+      console.log('Target:', S.editTarget);
+      const rev = S.reviews.find(r => String(r.id) === String(S.editTarget.revId));
+      console.log('Found Review:', rev);
+      if (!rev) {
+        toast('Lỗi: Không tìm thấy đánh giá gốc!', 'err');
+        return;
+      }
+      
+      D.btnSubmitEditReview.disabled = true;
+      try {
+        if (S.editTarget.isSubReview) {
+          const srIndex = rev.subReviews.findIndex(s => String(s.id) === String(S.editTarget.subRevId));
+          if (srIndex === -1) { 
+            toast('Lỗi: Không tìm thấy đánh giá phụ!', 'err');
+            D.btnSubmitEditReview.disabled = false; 
+            return; 
+          }
+          const sr = rev.subReviews[srIndex];
+          sr.rating = S.editStars;
+          sr.note = note;
+          sr.editCount = (sr.editCount || 0) + 1;
+          
+          if (db) {
+            await db.collection('reviews').doc(rev.id).update({ subReviews: rev.subReviews });
+          } else saveLocalReviews();
+        } else {
+          rev.rating = S.editStars;
+          rev.note = note;
+          rev.editCount = (rev.editCount || 0) + 1;
+          if (db) {
+            await db.collection('reviews').doc(rev.id).update({
+              rating: S.editStars,
+              note: note,
+              editCount: (rev.editCount || 0)
+            });
+          } else saveLocalReviews();
+        }
+        
+        closeBS(D.ovEditReview, D.shEditReview);
+        toast('Đã sửa thành công!', 'ok');
+        putRevMarker(rev);
+        openRevDetailSheet(rev);
+      } catch (err) {
+        console.error('Lỗi khi submit sửa:', err);
+        toast('Lỗi khi lưu! Vui lòng thử lại.', 'err');
+      }
+      D.btnSubmitEditReview.disabled = false;
+    });
+  }
+
   let _revSY=0;
   D.modalAddRevPanel.addEventListener('touchstart', e=>{_revSY=e.touches[0].clientY;},{passive:true});
   D.modalAddRevPanel.addEventListener('touchmove',  e=>{if(e.touches[0].clientY-_revSY>90) closeAddReview();},{passive:true});
@@ -1502,17 +1689,18 @@ function setupEvents() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 async function boot() {
-  console.log('🚀 FOOD DROP v3.0 booting...');
+  console.log('🚀 FOOD DROP v5.0 booting...');
   registerSW();
   initFirebase();
   setupEvents();
 
-  if (tryAutoLogin()) {
-    console.log('✅ Auto-login:', S.user.name);
-    showMainApp();
-  } else {
-    showLoginScreen();
-  }
+  loginAsGuest();
+
+  // Force Leaflet to recalculate map size after CSS layout settles
+  setTimeout(() => { if (S.map) S.map.invalidateSize(true); }, 100);
+  setTimeout(() => { if (S.map) S.map.invalidateSize(true); }, 500);
+  setTimeout(() => { if (S.map) S.map.invalidateSize(true); }, 1200);
+
   console.log('✅ FOOD DROP ready!');
 }
 

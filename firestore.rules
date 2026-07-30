@@ -1,0 +1,53 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(uid) {
+      return request.auth.uid == uid;
+    }
+
+    // 1. Users collection
+    match /users/{userId} {
+      // Anyone authenticated can read user profiles (needed to see friends' info)
+      allow read: if isAuthenticated();
+      
+      // Users can create/update their own profile
+      allow create: if isAuthenticated() && isOwner(userId);
+      allow update: if isAuthenticated() && (
+        isOwner(userId) || 
+        // Allow adding to friends array for 2-way friend requests
+        // (A user can update another user's friends list by adding their own UID)
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['friends']) &&
+         request.resource.data.friends.hasAll(resource.data.friends) &&
+         request.resource.data.friends.size() == resource.data.friends.size() + 1 &&
+         request.resource.data.friends[request.resource.data.friends.size() - 1] == request.auth.uid)
+      );
+      allow delete: if false; // Users shouldn't be deleted via client
+    }
+
+    // 2. Reviews collection
+    match /reviews/{reviewId} {
+      // Bounding box query requires read access for all authenticated users.
+      // Privacy is enforced via client-side filtering.
+      allow read: if isAuthenticated();
+      
+      // Users can only create their own reviews
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      
+      // Users can only update/delete their own reviews
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+    
+    // 3. Online Users (Ephemeral)
+    match /onlineUsers/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isOwner(userId);
+    }
+  }
+}
