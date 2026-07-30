@@ -158,6 +158,11 @@ const D = {
   // Sub-review modal
   ovAddSubReview:    $id('ov-add-sub-review'),
   shAddSubReview:    $id('sh-add-sub-review'),
+
+  // PWA Install Prompt
+  pwaInstallPrompt:  $id('pwa-install-prompt'),
+  btnInstallPwa:     $id('btn-install-pwa'),
+  btnClosePwa:       $id('btn-close-pwa'),
   btnCloseSubReview: $id('btn-close-sub-review'),
   chkAnonSubReview:  $id('chk-anon-sub-review'),
   inpSubReviewerName:$id('inp-sub-reviewer-name'),
@@ -1460,6 +1465,41 @@ function setupEvents() {
     D.btnCloseInfoModal.addEventListener('click', () => closeBS(D.ovInfoModal, D.shInfoModal));
     D.ovInfoModal.addEventListener('click', e => { if (e.target === D.ovInfoModal) closeBS(D.ovInfoModal, D.shInfoModal); });
   }
+
+  // ── PWA INSTALL ──
+  let deferredPrompt;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    if (D.pwaInstallPrompt) {
+      setTimeout(() => {
+        D.pwaInstallPrompt.classList.remove('translate-y-[150%]');
+      }, 3000);
+    }
+  });
+
+  if (D.btnInstallPwa) {
+    D.btnInstallPwa.addEventListener('click', async () => {
+      if (deferredPrompt) {
+        D.pwaInstallPrompt.classList.add('translate-y-[150%]');
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') console.log('PWA installed');
+        deferredPrompt = null;
+      }
+    });
+  }
+
+  if (D.btnClosePwa) {
+    D.btnClosePwa.addEventListener('click', () => {
+      D.pwaInstallPrompt.classList.add('translate-y-[150%]');
+    });
+  }
+
+  window.addEventListener('appinstalled', () => {
+    deferredPrompt = null;
+    if (D.pwaInstallPrompt) D.pwaInstallPrompt.classList.add('translate-y-[150%]');
+  });
 
   // ── MY PROFILE SHEET ──
   D.btnCloseMyProfile.addEventListener('click', closeMyProfile);
