@@ -14,12 +14,13 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const FIREBASE_CONFIG = {
-  apiKey:            'YOUR_API_KEY',
-  authDomain:        'YOUR_PROJECT_ID.firebaseapp.com',
-  projectId:         'YOUR_PROJECT_ID',
-  storageBucket:     'YOUR_PROJECT_ID.appspot.com',
-  messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
-  appId:             'YOUR_APP_ID',
+  apiKey: "AIzaSyDVbVWzkbX_9fLe7GT1X5HDYYnWg9LhD24",
+  authDomain: "food-drop-d63a4.firebaseapp.com",
+  projectId: "food-drop-d63a4",
+  storageBucket: "food-drop-d63a4.firebasestorage.app",
+  messagingSenderId: "307361054549",
+  appId: "1:307361054549:web:b86fd2c2d493dd1a3439dc",
+  measurementId: "G-MV3R6LMW4C"
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
